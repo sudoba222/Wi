@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'splash_page.dart';
 
 const Color kDarkPurple = Color(0xFF210B2C);
 const Color kWisteria = Color(0xFFBC96E6);
@@ -21,7 +22,7 @@ class WiApp extends StatelessWidget {
         fontFamily: 'Roboto',
         useMaterial3: true,
       ),
-      home: const HomePage(),
+      home: const SplashPage(),
       debugShowCheckedModeBanner: false,
     );
   }
@@ -37,7 +38,13 @@ class HomePage extends StatelessWidget {
         children: [
           Tooltip(
             message: 'Menu',
-            child: Icon(Icons.menu, color: kDarkPurple, size: 28),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: () {
+                Scaffold.of(context).openDrawer();
+              },
+              child: Icon(Icons.menu, color: kDarkPurple, size: 28),
+            ),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -142,10 +149,51 @@ class HomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: kWhite,
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            DrawerHeader(
+              decoration: BoxDecoration(color: kWisteria),
+              child: Text(
+                'Wi Menu',
+                style: TextStyle(
+                  color: kDarkPurple,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            ListTile(
+              leading: Icon(Icons.home, color: kDarkPurple),
+              title: Text('Home'),
+              onTap: () {
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.work_outline, color: kDarkPurple),
+              title: Text('Find a Job'),
+              onTap: () {
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.person_outline, color: kDarkPurple),
+              title: Text('Profile'),
+              onTap: () {
+                Navigator.pop(context);
+              },
+            ),
+          ],
+        ),
+      ),
       body: SafeArea(
         child: Column(
           children: [
-            _buildTopBar(context),
+            Builder(
+              builder: (context) => _buildTopBar(context),
+            ),
             Expanded(child: _buildFeedsPlaceholder()),
           ],
         ),
