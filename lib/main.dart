@@ -16,7 +16,7 @@ class WiApp extends StatelessWidget {
         fontFamily: 'Roboto',
         useMaterial3: true,
       ),
-      home: const SplashPage(),
+      home: const SplashPage(), // Start with splash
       debugShowCheckedModeBanner: false,
     );
   }
