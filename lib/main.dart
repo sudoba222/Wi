@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'screens/auth/login_page.dart';
+import 'screens/splash/splash_page.dart';
 
 void main() {
   runApp(const WiApp());
@@ -16,7 +16,7 @@ class WiApp extends StatelessWidget {
         fontFamily: 'Roboto',
         useMaterial3: true,
       ),
-      home: const LoginPage(),
+      home: const SplashPage(),
       debugShowCheckedModeBanner: false,
     );
   }
