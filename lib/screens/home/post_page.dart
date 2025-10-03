@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import '../../utils/app_colors.dart';
 import '../../services/global_data.dart';
@@ -173,11 +175,7 @@ class _PostPageState extends State<PostPage> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              size: 18,
-              color: AppColors.darkPurple.withOpacity(0.7),
-            ),
+            Icon(icon, size: 18, color: AppColors.darkPurple.withOpacity(0.7)),
             const SizedBox(width: 6),
             Text(
               label,
@@ -204,9 +202,12 @@ class _PostPageState extends State<PostPage> {
 
     final newPost = Post(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
+      authorId: 'demo_user',
       author: 'You',
+      authorProfilePicture: '',
       content: _contentController.text.trim(),
       timestamp: DateTime.now(),
+      likes: 0,
     );
 
     GlobalData.addPost(newPost);

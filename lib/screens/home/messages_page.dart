@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import '../../utils/app_colors.dart';
 import '../../services/global_data.dart';
@@ -71,10 +73,7 @@ class _MessagesPageState extends State<MessagesPage> {
                       ),
                       Text(
                         'Start a new chat to connect!',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey,
-                        ),
+                        style: TextStyle(fontSize: 14, color: Colors.grey),
                       ),
                     ],
                   ),
@@ -128,7 +127,8 @@ class _MessagesPageState extends State<MessagesPage> {
                                 const SizedBox(width: 16),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         conversation.userName,
@@ -143,7 +143,8 @@ class _MessagesPageState extends State<MessagesPage> {
                                         conversation.lastMessage,
                                         style: TextStyle(
                                           fontSize: 14,
-                                          color: AppColors.darkPurple.withOpacity(0.7),
+                                          color: AppColors.darkPurple
+                                              .withOpacity(0.7),
                                         ),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
@@ -155,7 +156,9 @@ class _MessagesPageState extends State<MessagesPage> {
                                   conversation.lastMessageTime,
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: AppColors.darkPurple.withOpacity(0.5),
+                                    color: AppColors.darkPurple.withOpacity(
+                                      0.5,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -178,9 +181,7 @@ class _MessagesPageState extends State<MessagesPage> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text(
           'Start New Chat',
           style: TextStyle(
@@ -193,9 +194,7 @@ class _MessagesPageState extends State<MessagesPage> {
           style: const TextStyle(color: AppColors.darkPurple),
           decoration: InputDecoration(
             hintText: 'Enter name',
-            hintStyle: TextStyle(
-              color: AppColors.darkPurple.withOpacity(0.6),
-            ),
+            hintStyle: TextStyle(color: AppColors.darkPurple.withOpacity(0.6)),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(color: AppColors.wisteria),
@@ -211,9 +210,7 @@ class _MessagesPageState extends State<MessagesPage> {
             onPressed: () => Navigator.pop(context),
             child: Text(
               'Cancel',
-              style: TextStyle(
-                color: AppColors.darkPurple.withOpacity(0.6),
-              ),
+              style: TextStyle(color: AppColors.darkPurple.withOpacity(0.6)),
             ),
           ),
           ElevatedButton(

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1010532497487",
+    "project_id": "work--interconnected",
+    "storage_bucket": "work--interconnected.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1010532497487:android:0243250d140044ac62d23a",
+        "android_client_info": {
+          "package_name": "com.example.wi"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDLQEQK2z2yjUyKqLc-IID4GuVyfL_NdrU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
