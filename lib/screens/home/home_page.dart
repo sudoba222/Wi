@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../utils/app_colors.dart';
+import '../../services/auth_services.dart' hide UserProfile;
 import 'feed_page.dart';
 import 'post_page.dart';
 import 'messages_page.dart';
@@ -29,43 +31,44 @@ class _HomePageState extends State<HomePage> {
       _currentIndex = index;
     });
   }
+
   UserProfile _getSampleProfile() {
-  return UserProfile(
-    id: '1',
-    name: 'John Doe',
-    jobTitle: 'Software Developer',
-    company: 'Tech Company',
-    location: 'New York, NY',
-    bio: 'Passionate developer with 3+ years of experience in Flutter and mobile development.',
-    connections: 487,
-    posts: 23,
-    followers: 1205,
-    isOwnProfile: true,
-    experience: [
-      Experience(
-        id: '1',
-        position: 'Software Developer',
-        company: 'Tech Company',
-        location: 'New York, NY',
-        startDate: DateTime(2022, 1),
-        isCurrent: true,
-        description: 'Developing mobile applications using Flutter and Firebase.',
-      ),
-    ],
-    education: [
-      Education(
-        id: '1',
-        institution: 'University of Technology',
-        degree: 'Bachelor of Science',
-        fieldOfStudy: 'Computer Science',
-        startDate: DateTime(2018),
-        endDate: DateTime(2021),
-        grade: '3.7 GPA',
-      ),
-    ],
-    skills: ['Flutter', 'Dart', 'Firebase', 'Git', 'UI/UX'],
-  );
-}
+    return UserProfile(
+      id: '1',
+      name: 'John Doe',
+      jobTitle: 'Software Developer',
+      company: 'Tech Company',
+      location: 'New York, NY',
+      bio: 'Passionate developer with 3+ years of experience in Flutter and mobile development.',
+      connections: 487,
+      posts: 23,
+      followers: 1205,
+      isOwnProfile: true,
+      experience: [
+        Experience(
+          id: '1',
+          position: 'Software Developer',
+          company: 'Tech Company',
+          location: 'New York, NY',
+          startDate: DateTime(2022, 1),
+          isCurrent: true,
+          description: 'Developing mobile applications using Flutter and Firebase.',
+        ),
+      ],
+      education: [
+        Education(
+          id: '1',
+          institution: 'University of Technology',
+          degree: 'Bachelor of Science',
+          fieldOfStudy: 'Computer Science',
+          startDate: DateTime(2018),
+          endDate: DateTime(2021),
+          grade: '3.7 GPA',
+        ),
+      ],
+      skills: ['Flutter', 'Dart', 'Firebase', 'Git', 'UI/UX'],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -81,9 +84,12 @@ class _HomePageState extends State<HomePage> {
               child: Row(
                 children: [
                   IconButton(
-                    onPressed: () {},
+                    onPressed: () async {
+                      final authService = Provider.of<AuthService>(context, listen: false);
+                      await authService.signOut();
+                    },
                     icon: const Icon(
-                      Icons.menu,
+                      Icons.logout,
                       color: AppColors.darkPurple,
                       size: 28,
                     ),
@@ -124,15 +130,15 @@ class _HomePageState extends State<HomePage> {
                   ),
                   IconButton(
                     onPressed: () {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => ProfilePage(
-        userProfile: _getSampleProfile(),
-      ),
-    ),
-  );
-},
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ProfilePage(
+                            userProfile: _getSampleProfile(),
+                          ),
+                        ),
+                      );
+                    },
                     icon: const Icon(
                       Icons.person_outline,
                       color: AppColors.darkPurple,
