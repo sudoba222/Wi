@@ -1,6 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
+import 'package:google_sign_in/google_sign_in.dart';
 class AuthResult {
   final bool isSuccess;
   final String message;
@@ -97,7 +97,38 @@ class AuthService {
       return null;
     }
   }
+  Future<AuthResult> signInWithGoogle() async {
+  try {
+    final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
 
+    if (googleUser == null) {
+      return AuthResult(isSuccess: false, message: 'Google sign in was cancelled');
+    }
+
+    final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+
+    final credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
+    );
+
+    final userCredential = await _auth.signInWithCredential(credential);
+
+    // Save user profile to Firestore if new user
+    if (userCredential.additionalUserInfo?.isNewUser == true) {
+      await _firestore.collection('users').doc(userCredential.user!.uid).set({
+        'uid': userCredential.user!.uid,
+        'fullName': userCredential.user!.displayName ?? '',
+        'email': userCredential.user!.email ?? '',
+        'profilePicture': userCredential.user!.photoURL ?? '',
+      });
+    }
+
+    return AuthResult(isSuccess: true, message: 'Google sign in successful');
+  } catch (e) {
+    return AuthResult(isSuccess: false, message: e.toString());
+  }
+  }
   Future<void> signOut() async {
     await _auth.signOut();
   }

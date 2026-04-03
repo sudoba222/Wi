@@ -44,7 +44,6 @@ class _LoginPageState extends State<LoginPage> {
       setState(() => _isLoading = false);
 
       if (result.isSuccess) {
-        // AuthWrapper will automatically navigate to HomePage
         print('✅ Login successful!');
       } else {
         setState(() => _errorMessage = result.message);
@@ -63,6 +62,31 @@ class _LoginPageState extends State<LoginPage> {
         _isLoading = false;
         _errorMessage = 'An unexpected error occurred. Please try again.';
       });
+    }
+  }
+
+  Future<void> _handleGoogleSignIn() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final result = await authService.signInWithGoogle();
+
+      setState(() => _isLoading = false);
+
+      if (!result.isSuccess) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result.message),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
     }
   }
 
@@ -147,6 +171,8 @@ class _LoginPageState extends State<LoginPage> {
                       ],
 
                       const SizedBox(height: 32),
+
+                      // Login button
                       SizedBox(
                         width: double.infinity,
                         height: 56,
@@ -181,6 +207,8 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ),
                       const SizedBox(height: 16),
+
+                      // Create Account button
                       SizedBox(
                         width: double.infinity,
                         height: 56,
@@ -205,6 +233,68 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                           child: const Text(
                             'Create Account',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Divider
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Divider(
+                              color: AppColors.darkPurple.withOpacity(0.3),
+                              thickness: 1,
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: Text(
+                              'or',
+                              style: TextStyle(
+                                color: AppColors.darkPurple.withOpacity(0.6),
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Divider(
+                              color: AppColors.darkPurple.withOpacity(0.3),
+                              thickness: 1,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Google Sign-In button
+                      SizedBox(
+                        width: double.infinity,
+                        height: 56,
+                        child: ElevatedButton.icon(
+                          onPressed: _isLoading ? null : _handleGoogleSignIn,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: AppColors.darkPurple,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              side: const BorderSide(
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                          icon: Image.network(
+                            'https://www.google.com/favicon.ico',
+                            height: 24,
+                            width: 24,
+                          ),
+                          label: const Text(
+                            'Continue with Google',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w600,
