@@ -90,6 +90,79 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  Future<void> _handleForgotPassword() async {
+    final emailController = TextEditingController(
+      text: _emailController.text,
+    );
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'Reset Password',
+          style: TextStyle(color: AppColors.darkPurple),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Enter your email and we will send you a password reset link.',
+              style: TextStyle(
+                color: AppColors.darkPurple.withOpacity(0.7),
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: emailController,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(
+                labelText: 'Email',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.email_outlined),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.darkPurple)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (emailController.text.trim().isEmpty) return;
+
+              Navigator.pop(context);
+
+              final authService = Provider.of<AuthService>(context, listen: false);
+              final result = await authService.resetPassword(
+                email: emailController.text.trim(),
+              );
+
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(result.message),
+                    backgroundColor: result.isSuccess ? Colors.green : Colors.red,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.sunglow,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Send Reset Link', style: TextStyle(color: AppColors.darkPurple)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -140,6 +213,19 @@ class _LoginPageState extends State<LoginPage> {
                         icon: Icons.lock_outline,
                         isPassword: true,
                       ),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: _handleForgotPassword,
+                          child: Text(
+                            'Forgot Password?',
+                            style: TextStyle(
+                              color: AppColors.darkPurple.withOpacity(0.7),
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ),
 
                       // Error message
                       if (_errorMessage.isNotEmpty) ...[
@@ -155,14 +241,12 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.error_outline,
-                                  color: Colors.red, size: 20),
+                              const Icon(Icons.error_outline, color: Colors.red, size: 20),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   _errorMessage,
-                                  style: const TextStyle(
-                                      color: Colors.red, fontSize: 14),
+                                  style: const TextStyle(color: Colors.red, fontSize: 14),
                                 ),
                               ),
                             ],
@@ -283,9 +367,7 @@ class _LoginPageState extends State<LoginPage> {
                             elevation: 0,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
-                              side: const BorderSide(
-                                color: Colors.white,
-                              ),
+                              side: const BorderSide(color: Colors.white),
                             ),
                           ),
                           icon: Image.network(
