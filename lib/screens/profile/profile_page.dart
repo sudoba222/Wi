@@ -8,6 +8,8 @@ import '../../widgets/glassmorphic_container.dart';
 import '../../models/user_profile.dart';
 import '../../models/experience.dart';
 import '../../models/education.dart';
+import 'package:provider/provider.dart';
+import '../../services/auth_services.dart' hide UserProfile;
 
 class ProfilePage extends StatefulWidget {
   final UserProfile userProfile;
