@@ -112,8 +112,9 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
                   IconButton(
-                    onPressed: () {
-                      if (_userProfile != null) {
+                      onPressed: () async {
+                      await _loadUserProfile();
+                      if (_userProfile != null && mounted) {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
