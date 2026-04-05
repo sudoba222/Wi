@@ -26,4 +26,30 @@ class Education {
     }
     return start;
   }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'institution': institution,
+      'degree': degree,
+      'fieldOfStudy': fieldOfStudy,
+      'startDate': startDate.toIso8601String(),
+      'endDate': endDate?.toIso8601String(),
+      'grade': grade,
+      'description': description,
+    };
+  }
+
+  factory Education.fromMap(Map<String, dynamic> map) {
+    return Education(
+      id: map['id'] ?? '',
+      institution: map['institution'] ?? '',
+      degree: map['degree'] ?? '',
+      fieldOfStudy: map['fieldOfStudy'] ?? '',
+      startDate: DateTime.parse(map['startDate']),
+      endDate: map['endDate'] != null ? DateTime.parse(map['endDate']) : null,
+      grade: map['grade'] ?? '',
+      description: map['description'] ?? '',
+    );
+  }
 }

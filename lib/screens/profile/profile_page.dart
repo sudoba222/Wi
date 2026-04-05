@@ -84,6 +84,7 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
     );
   }
+
   Widget _buildProfileHeader(UserProfile profile) {
     return Container(
       transform: Matrix4.translationValues(0, -50, 0),
@@ -612,7 +613,10 @@ class _ProfilePageState extends State<ProfilePage> {
               final authService = Provider.of<AuthService>(context, listen: false);
               final uid = authService.currentUser?.uid;
               if (uid != null) {
-                await authService.firestore.collection('users').doc(uid).update({'bio': bioController.text});
+                await authService.firestore
+                    .collection('users')
+                    .doc(uid)
+                    .update({'bio': bioController.text});
               }
               setState(() {
                 _currentProfile = UserProfile(
@@ -696,7 +700,7 @@ class _ProfilePageState extends State<ProfilePage> {
               child: const Text('Cancel', style: TextStyle(color: AppColors.darkPurple)),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 final newExperience = Experience(
                   id: experience?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
                   position: positionController.text,
@@ -707,14 +711,24 @@ class _ProfilePageState extends State<ProfilePage> {
                   isCurrent: isCurrent,
                   description: descriptionController.text,
                 );
+
+                List<Experience> updated = List.from(_currentProfile.experience);
+                if (isEditing) {
+                  final index = updated.indexWhere((exp) => exp.id == experience!.id);
+                  if (index != -1) updated[index] = newExperience;
+                } else {
+                  updated.add(newExperience);
+                }
+
+                final authService = Provider.of<AuthService>(context, listen: false);
+                final uid = authService.currentUser?.uid;
+                if (uid != null) {
+                  await authService.firestore.collection('users').doc(uid).update({
+                    'experience': updated.map((e) => e.toMap()).toList(),
+                  });
+                }
+
                 setState(() {
-                  List<Experience> updated = List.from(_currentProfile.experience);
-                  if (isEditing) {
-                    final index = updated.indexWhere((exp) => exp.id == experience!.id);
-                    if (index != -1) updated[index] = newExperience;
-                  } else {
-                    updated.add(newExperience);
-                  }
                   _currentProfile = UserProfile(
                     id: _currentProfile.id,
                     name: _currentProfile.name,
@@ -757,7 +771,19 @@ class _ProfilePageState extends State<ProfilePage> {
             child: const Text('Cancel', style: TextStyle(color: AppColors.darkPurple)),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
+              final updatedExperience = _currentProfile.experience
+                  .where((exp) => exp.id != experience.id)
+                  .toList();
+
+              final authService = Provider.of<AuthService>(context, listen: false);
+              final uid = authService.currentUser?.uid;
+              if (uid != null) {
+                await authService.firestore.collection('users').doc(uid).update({
+                  'experience': updatedExperience.map((e) => e.toMap()).toList(),
+                });
+              }
+
               setState(() {
                 _currentProfile = UserProfile(
                   id: _currentProfile.id,
@@ -770,7 +796,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   connections: _currentProfile.connections,
                   posts: _currentProfile.posts,
                   followers: _currentProfile.followers,
-                  experience: _currentProfile.experience.where((exp) => exp.id != experience.id).toList(),
+                  experience: updatedExperience,
                   education: _currentProfile.education,
                   skills: _currentProfile.skills,
                   isOwnProfile: _currentProfile.isOwnProfile,
@@ -827,7 +853,7 @@ class _ProfilePageState extends State<ProfilePage> {
             child: const Text('Cancel', style: TextStyle(color: AppColors.darkPurple)),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               final newEducation = Education(
                 id: education?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
                 institution: institutionController.text,
@@ -838,14 +864,24 @@ class _ProfilePageState extends State<ProfilePage> {
                 grade: gradeController.text,
                 description: descriptionController.text,
               );
+
+              List<Education> updated = List.from(_currentProfile.education);
+              if (isEditing) {
+                final index = updated.indexWhere((edu) => edu.id == education!.id);
+                if (index != -1) updated[index] = newEducation;
+              } else {
+                updated.add(newEducation);
+              }
+
+              final authService = Provider.of<AuthService>(context, listen: false);
+              final uid = authService.currentUser?.uid;
+              if (uid != null) {
+                await authService.firestore.collection('users').doc(uid).update({
+                  'education': updated.map((e) => e.toMap()).toList(),
+                });
+              }
+
               setState(() {
-                List<Education> updated = List.from(_currentProfile.education);
-                if (isEditing) {
-                  final index = updated.indexWhere((edu) => edu.id == education!.id);
-                  if (index != -1) updated[index] = newEducation;
-                } else {
-                  updated.add(newEducation);
-                }
                 _currentProfile = UserProfile(
                   id: _currentProfile.id,
                   name: _currentProfile.name,
@@ -887,7 +923,19 @@ class _ProfilePageState extends State<ProfilePage> {
             child: const Text('Cancel', style: TextStyle(color: AppColors.darkPurple)),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
+              final updatedEducation = _currentProfile.education
+                  .where((edu) => edu.id != education.id)
+                  .toList();
+
+              final authService = Provider.of<AuthService>(context, listen: false);
+              final uid = authService.currentUser?.uid;
+              if (uid != null) {
+                await authService.firestore.collection('users').doc(uid).update({
+                  'education': updatedEducation.map((e) => e.toMap()).toList(),
+                });
+              }
+
               setState(() {
                 _currentProfile = UserProfile(
                   id: _currentProfile.id,
@@ -901,7 +949,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   posts: _currentProfile.posts,
                   followers: _currentProfile.followers,
                   experience: _currentProfile.experience,
-                  education: _currentProfile.education.where((edu) => edu.id != education.id).toList(),
+                  education: updatedEducation,
                   skills: _currentProfile.skills,
                   isOwnProfile: _currentProfile.isOwnProfile,
                 );
@@ -915,7 +963,6 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
     );
   }
-
   Widget _buildExperienceSection(UserProfile profile) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),

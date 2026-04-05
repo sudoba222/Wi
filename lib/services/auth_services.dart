@@ -2,6 +2,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../models/user_profile.dart';
+import '../models/experience.dart';
+import '../models/education.dart';
 
 class AuthResult {
   final bool isSuccess;
@@ -112,6 +114,14 @@ class AuthService {
       final doc = await firestore.collection('users').doc(uid).get();
       if (doc.exists) {
         final data = doc.data()!;
+        final experienceList = (data['experience'] as List<dynamic>? ?? [])
+    .map((e) => Experience.fromMap(e as Map<String, dynamic>))
+    .toList();
+
+        final educationList = (data['education'] as List<dynamic>? ?? [])
+            .map((e) => Education.fromMap(e as Map<String, dynamic>))
+            .toList();
+
         return UserProfile(
           id: uid,
           name: data['fullName'] ?? '',
@@ -124,6 +134,8 @@ class AuthService {
           posts: data['posts'] ?? 0,
           followers: data['followers'] ?? 0,
           skills: List<String>.from(data['skills'] ?? []),
+          experience: experienceList,
+          education: educationList,
           isOwnProfile: true,
         );
       }
