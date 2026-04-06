@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/post.dart';
 import '../models/comment.dart';
+import '../models/user_profile.dart';
 import 'auth_services.dart';
 // ignore_for_file: avoid_print
 
@@ -27,16 +28,15 @@ class PostService {
       final currentUser = _auth.currentUser;
       if (currentUser == null) return false;
 
-      // Get user profile
       final authService = AuthService();
-      final userProfile = await authService.getUserProfile(currentUser.uid);
+      final userProfile = await authService.getFullUserProfile(currentUser.uid);
       if (userProfile == null) return false;
 
       final postRef = _firestore.collection('posts').doc();
       final post = Post(
         id: postRef.id,
         authorId: currentUser.uid,
-        author: userProfile.fullName,
+        author: userProfile.name,
         authorProfilePicture: userProfile.profilePicture,
         content: content,
         timestamp: DateTime.now(),
@@ -45,7 +45,6 @@ class PostService {
       await postRef.set(post.toFirestore());
       return true;
     } catch (e) {
-      // ignore_for_file: avoid_print
       print('Error creating post: $e');
       return false;
     }
@@ -106,28 +105,28 @@ class PostService {
       if (currentUser == null) return;
 
       final authService = AuthService();
-      final userProfile = await authService.getUserProfile(currentUser.uid);
+      final userProfile = await authService.getFullUserProfile(currentUser.uid);
       if (userProfile == null) return;
 
       final samplePosts = [
         {
           'content':
               'Excited to announce our new partnership with local businesses in Dushanbe! This collaboration will bring innovative solutions to the Tajikistan market.',
-          'author': userProfile.fullName,
+          'author': userProfile.name,
           'authorId': currentUser.uid,
           'authorProfilePicture': userProfile.profilePicture,
         },
         {
           'content':
               'Just finished an amazing workshop on digital transformation. The future of business in Central Asia looks bright! #Entrepreneurship #Tajikistan',
-          'author': userProfile.fullName,
+          'author': userProfile.name,
           'authorId': currentUser.uid,
           'authorProfilePicture': userProfile.profilePicture,
         },
         {
           'content':
               'Looking for talented developers to join our team. If you\'re passionate about creating impactful software solutions, let\'s connect!',
-          'author': userProfile.fullName,
+          'author': userProfile.name,
           'authorId': currentUser.uid,
           'authorProfilePicture': userProfile.profilePicture,
         },
@@ -172,9 +171,8 @@ class PostService {
       final currentUser = _auth.currentUser;
       if (currentUser == null) return false;
 
-      // Get user profile
       final authService = AuthService();
-      final userProfile = await authService.getUserProfile(currentUser.uid);
+      final userProfile = await authService.getFullUserProfile(currentUser.uid);
       if (userProfile == null) return false;
 
       final commentRef = _firestore
@@ -187,15 +185,13 @@ class PostService {
         id: commentRef.id,
         postId: postId,
         authorId: currentUser.uid,
-        author: userProfile.fullName,
+        author: userProfile.name,
         authorProfilePicture: userProfile.profilePicture,
         content: content,
         timestamp: DateTime.now(),
       );
 
       await commentRef.set(comment.toFirestore());
-
-      // Update comment count on post
       await _updateCommentCount(postId);
 
       return true;
@@ -256,8 +252,6 @@ class PostService {
       if (comment.authorId != currentUser.uid) return false;
 
       await commentRef.delete();
-
-      // Update comment count on post
       await _updateCommentCount(postId);
 
       return true;

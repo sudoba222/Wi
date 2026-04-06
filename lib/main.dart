@@ -1,7 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:provider/provider.dart';
+import 'firebase_options.dart';
+import 'services/auth_services.dart';
 import 'screens/splash/splash_page.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const WiApp());
 }
 
@@ -10,14 +18,21 @@ class WiApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Wi Tajikistan',
-      theme: ThemeData(
-        fontFamily: 'Roboto',
-        useMaterial3: true,
+    return MultiProvider(
+      providers: [
+        Provider<AuthService>(
+          create: (_) => AuthService(),
+        ),
+      ],
+      child: MaterialApp(
+        title: 'Wi Tajikistan',
+        theme: ThemeData(
+          fontFamily: 'Roboto',
+          useMaterial3: true,
+        ),
+        home: const SplashPage(),
+        debugShowCheckedModeBanner: false,
       ),
-      home: const SplashPage(), // Start with splash
-      debugShowCheckedModeBanner: false,
     );
   }
 }
