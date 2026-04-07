@@ -2,14 +2,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:provider/provider.dart';
 import '../../utils/app_colors.dart';
 import '../../widgets/glassmorphic_container.dart';
 import '../../models/user_profile.dart';
 import '../../models/experience.dart';
 import '../../models/education.dart';
-import '../../services/auth_services.dart' hide UserProfile;
-import '../../services/cloudinary_service.dart';
 
 class ProfilePage extends StatefulWidget {
   final UserProfile userProfile;
@@ -23,7 +20,6 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _isConnected = false;
   late UserProfile _currentProfile;
   File? _profileImage;
-  bool _isUploadingImage = false;
   final ImagePicker _picker = ImagePicker();
   final ScrollController _scrollController = ScrollController();
   double _scrollOffset = 0;
@@ -267,14 +263,6 @@ class _ProfilePageState extends State<ProfilePage> {
 
   /// The actual image / initial-letter content for the morphing photo.
   Widget _buildPhotoContent(UserProfile profile) {
-    if (_isUploadingImage) {
-      return Container(
-        color: AppColors.darkPurple,
-        child: const Center(
-          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-        ),
-      );
-    }
     if (_profileImage != null) {
       return Image.file(_profileImage!, fit: BoxFit.cover);
     }
@@ -558,72 +546,11 @@ class _ProfilePageState extends State<ProfilePage> {
         maxHeight: 500,
         imageQuality: 80,
       );
-
+      Navigator.pop(context);
       if (pickedFile != null) {
-        setState(() => _isUploadingImage = true);
-        Navigator.pop(context);
-
-        final cloudinaryService = CloudinaryService();
-        final imageUrl = await cloudinaryService.uploadProfilePicture(File(pickedFile.path));
-
-        if (imageUrl != null) {
-          final authService = Provider.of<AuthService>(context, listen: false);
-          final uid = authService.currentUser?.uid;
-
-          if (uid != null) {
-            await authService.firestore
-                .collection('users')
-                .doc(uid)
-                .update({'profilePicture': imageUrl});
-          }
-
-          setState(() {
-            _profileImage = File(pickedFile.path);
-            _currentProfile = UserProfile(
-              id: _currentProfile.id,
-              name: _currentProfile.name,
-              jobTitle: _currentProfile.jobTitle,
-              company: _currentProfile.company,
-              location: _currentProfile.location,
-              bio: _currentProfile.bio,
-              profilePicture: imageUrl,
-              connections: _currentProfile.connections,
-              posts: _currentProfile.posts,
-              followers: _currentProfile.followers,
-              experience: _currentProfile.experience,
-              education: _currentProfile.education,
-              skills: _currentProfile.skills,
-              isOwnProfile: _currentProfile.isOwnProfile,
-            );
-            _isUploadingImage = false;
-          });
-
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Profile picture updated successfully!'),
-                backgroundColor: Colors.green,
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-          }
-        } else {
-          setState(() => _isUploadingImage = false);
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Failed to upload image. Please try again.'),
-                backgroundColor: Colors.red,
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-          }
-        }
-      } else {
-        Navigator.pop(context);
+        setState(() => _profileImage = File(pickedFile.path));
       }
     } catch (e) {
-      setState(() => _isUploadingImage = false);
       Navigator.pop(context);
     }
   }
@@ -683,17 +610,7 @@ class _ProfilePageState extends State<ProfilePage> {
             child: const Text('Cancel', style: TextStyle(color: AppColors.darkPurple)),
           ),
           ElevatedButton(
-            onPressed: () async {
-              final authService = Provider.of<AuthService>(context, listen: false);
-              final uid = authService.currentUser?.uid;
-              if (uid != null) {
-                await authService.firestore.collection('users').doc(uid).update({
-                  'fullName': nameController.text,
-                  'jobTitle': jobTitleController.text,
-                  'company': companyController.text,
-                  'location': locationController.text,
-                });
-              }
+            onPressed: () {
               setState(() {
                 _currentProfile = UserProfile(
                   id: _currentProfile.id,
@@ -746,15 +663,7 @@ class _ProfilePageState extends State<ProfilePage> {
             child: const Text('Cancel', style: TextStyle(color: AppColors.darkPurple)),
           ),
           ElevatedButton(
-            onPressed: () async {
-              final authService = Provider.of<AuthService>(context, listen: false);
-              final uid = authService.currentUser?.uid;
-              if (uid != null) {
-                await authService.firestore
-                    .collection('users')
-                    .doc(uid)
-                    .update({'bio': bioController.text});
-              }
+            onPressed: () {
               setState(() {
                 _currentProfile = UserProfile(
                   id: _currentProfile.id,
@@ -857,14 +766,6 @@ class _ProfilePageState extends State<ProfilePage> {
                   updated.add(newExperience);
                 }
 
-                final authService = Provider.of<AuthService>(context, listen: false);
-                final uid = authService.currentUser?.uid;
-                if (uid != null) {
-                  await authService.firestore.collection('users').doc(uid).update({
-                    'experience': updated.map((e) => e.toMap()).toList(),
-                  });
-                }
-
                 setState(() {
                   _currentProfile = UserProfile(
                     id: _currentProfile.id,
@@ -912,14 +813,6 @@ class _ProfilePageState extends State<ProfilePage> {
               final updatedExperience = _currentProfile.experience
                   .where((exp) => exp.id != experience.id)
                   .toList();
-
-              final authService = Provider.of<AuthService>(context, listen: false);
-              final uid = authService.currentUser?.uid;
-              if (uid != null) {
-                await authService.firestore.collection('users').doc(uid).update({
-                  'experience': updatedExperience.map((e) => e.toMap()).toList(),
-                });
-              }
 
               setState(() {
                 _currentProfile = UserProfile(
@@ -1010,14 +903,6 @@ class _ProfilePageState extends State<ProfilePage> {
                 updated.add(newEducation);
               }
 
-              final authService = Provider.of<AuthService>(context, listen: false);
-              final uid = authService.currentUser?.uid;
-              if (uid != null) {
-                await authService.firestore.collection('users').doc(uid).update({
-                  'education': updated.map((e) => e.toMap()).toList(),
-                });
-              }
-
               setState(() {
                 _currentProfile = UserProfile(
                   id: _currentProfile.id,
@@ -1064,14 +949,6 @@ class _ProfilePageState extends State<ProfilePage> {
               final updatedEducation = _currentProfile.education
                   .where((edu) => edu.id != education.id)
                   .toList();
-
-              final authService = Provider.of<AuthService>(context, listen: false);
-              final uid = authService.currentUser?.uid;
-              if (uid != null) {
-                await authService.firestore.collection('users').doc(uid).update({
-                  'education': updatedEducation.map((e) => e.toMap()).toList(),
-                });
-              }
 
               setState(() {
                 _currentProfile = UserProfile(
@@ -1431,12 +1308,7 @@ class _ProfilePageState extends State<ProfilePage> {
               child: const Text('Cancel', style: TextStyle(color: AppColors.darkPurple)),
             ),
             ElevatedButton(
-              onPressed: () async {
-                final authService = Provider.of<AuthService>(context, listen: false);
-                final uid = authService.currentUser?.uid;
-                if (uid != null) {
-                  await authService.firestore.collection('users').doc(uid).update({'skills': currentSkills});
-                }
+              onPressed: () {
                 setState(() {
                   _currentProfile = UserProfile(
                     id: _currentProfile.id,
