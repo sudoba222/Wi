@@ -1,12 +1,17 @@
 // ignore_for_file: deprecated_member_use
 
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../utils/app_colors.dart';
 import '../../models/conversation.dart';
 import '../../models/message.dart';
 
+/// Full-screen chat screen for a single conversation.
+/// Uses an in-memory [Conversation] from GlobalData — no Firebase wiring yet.
 class ChatScreen extends StatefulWidget {
   final Conversation conversation;
+
+  /// Callback fired after the user sends a message so the parent can rebuild.
   final VoidCallback onMessageSent;
 
   const ChatScreen({
@@ -22,17 +27,34 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
+
+  /// True when the input field contains non-whitespace text.
   bool _hasText = false;
+
+  // ── Lifecycle ──────────────────────────────────────────────────────────────
 
   @override
   void initState() {
     super.initState();
+    // Watch input changes to toggle the send button.
     _controller.addListener(() {
       setState(() => _hasText = _controller.text.trim().isNotEmpty);
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+    // Scroll to the latest message after the first frame.
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _scrollToBottom());
   }
 
+  @override
+  void dispose() {
+    _controller.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  // ── Actions ────────────────────────────────────────────────────────────────
+
+  /// Animates the scroll position to the bottom of the message list.
   void _scrollToBottom() {
     if (_scrollController.hasClients) {
       _scrollController.animateTo(
@@ -43,6 +65,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  /// Appends a new sent message to the conversation and scrolls down.
   void _sendMessage() {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
@@ -57,8 +80,11 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() => widget.conversation.messages.add(newMsg));
     _controller.clear();
     widget.onMessageSent();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _scrollToBottom());
   }
+
+  // ── Build ──────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -66,109 +92,149 @@ class _ChatScreenState extends State<ChatScreen> {
     final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
 
     return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.white,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        leading: IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: const Icon(
-            Icons.arrow_back_ios_rounded,
-            color: AppColors.darkPurple,
-            size: 20,
+      // Gradient background matching the app design system.
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFF0EAFF), AppColors.background],
           ),
         ),
-        titleSpacing: 0,
-        title: Row(
+        child: Column(
           children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [AppColors.wisteria, AppColors.splashPurple],
-                ),
-              ),
-              child: Center(
-                child: Text(
-                  initial,
-                  style: const TextStyle(
-                    color: AppColors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
+            // ── Top app bar ─────────────────────────────────────────────
+            _buildAppBar(context, name, initial),
+            // ── Message list ────────────────────────────────────────────
+            Expanded(
+              child: widget.conversation.messages.isEmpty
+                  ? _buildEmptyState(name)
+                  : ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                      itemCount: widget.conversation.messages.length,
+                      itemBuilder: (_, i) => _MessageBubble(
+                          message: widget.conversation.messages[i]),
+                    ),
             ),
-            const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  name,
-                  style: const TextStyle(
-                    color: AppColors.darkPurple,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const Text(
-                  'Online',
-                  style: TextStyle(
-                    color: Color(0xFF2ECC71),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
+            // ── Input bar ────────────────────────────────────────────────
+            _buildInputBar(),
           ],
         ),
-        actions: [
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.videocam_outlined, color: AppColors.darkPurple),
-          ),
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.call_outlined, color: AppColors.darkPurple),
-          ),
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.more_vert_rounded, color: AppColors.darkPurple),
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: widget.conversation.messages.isEmpty
-                ? _buildEmptyState(name)
-                : ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    itemCount: widget.conversation.messages.length,
-                    itemBuilder: (_, i) =>
-                        _MessageBubble(message: widget.conversation.messages[i]),
-                  ),
-          ),
-          _buildInputBar(),
-        ],
       ),
     );
   }
 
+  /// Glass-tinted top bar with back arrow, avatar + name, and action icons.
+  Widget _buildAppBar(
+      BuildContext context, String name, String initial) {
+    final topPad = MediaQuery.of(context).padding.top;
+    return ClipRect(
+      child: BackdropFilter(
+        // Subtle blur on the header background.
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          padding: EdgeInsets.fromLTRB(4, topPad + 4, 4, 4),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.72),
+            border: Border(
+              bottom: BorderSide(
+                color: Colors.white.withOpacity(0.4),
+                width: 1,
+              ),
+            ),
+          ),
+          child: Row(
+            children: [
+              // Back button.
+              IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(
+                  Icons.arrow_back_ios_rounded,
+                  color: AppColors.darkPurple,
+                  size: 20,
+                ),
+              ),
+              // Gradient avatar circle.
+              Container(
+                width: 38,
+                height: 38,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [AppColors.wisteria, AppColors.splashPurple],
+                  ),
+                ),
+                child: Center(
+                  child: Text(
+                    initial,
+                    style: const TextStyle(
+                      color: AppColors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              // Contact name + online status.
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        color: AppColors.darkPurple,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const Text(
+                      'Online',
+                      style: TextStyle(
+                        color: Color(0xFF2ECC71),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Action icons — video call, voice call, more.
+              IconButton(
+                onPressed: () {},
+                icon: const Icon(Icons.videocam_outlined,
+                    color: AppColors.darkPurple),
+              ),
+              IconButton(
+                onPressed: () {},
+                icon: const Icon(Icons.call_outlined,
+                    color: AppColors.darkPurple),
+              ),
+              IconButton(
+                onPressed: () {},
+                icon: const Icon(Icons.more_vert_rounded,
+                    color: AppColors.darkPurple),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Empty state shown when no messages exist in the conversation.
   Widget _buildEmptyState(String name) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          // Tinted waving-hand icon.
           Container(
             width: 72,
             height: 72,
@@ -201,94 +267,103 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  /// Glass input bar at the bottom with attach, text field, and send button.
   Widget _buildInputBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.darkPurple.withOpacity(0.07),
-            blurRadius: 16,
-            offset: const Offset(0, -4),
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.72),
+            border: Border(
+              top: BorderSide(
+                color: Colors.white.withOpacity(0.4),
+                width: 1,
+              ),
+            ),
           ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Row(
-          children: [
-            IconButton(
-              onPressed: () {},
-              icon: const Icon(
-                Icons.attach_file_rounded,
-                color: AppColors.wisteria,
-                size: 22,
-              ),
-            ),
-            Expanded(
-              child: Container(
-                constraints: const BoxConstraints(maxHeight: 120),
-                decoration: BoxDecoration(
-                  color: AppColors.background,
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: TextField(
-                  controller: _controller,
-                  maxLines: null,
-                  style: const TextStyle(
-                    color: AppColors.darkPurple,
-                    fontSize: 15,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'Message…',
-                    hintStyle: TextStyle(
-                      color: AppColors.mutedText.withOpacity(0.8),
-                      fontSize: 15,
-                    ),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 10,
-                    ),
+          child: SafeArea(
+            top: false,
+            child: Row(
+              children: [
+                // Attach-file icon button.
+                IconButton(
+                  onPressed: () {},
+                  icon: const Icon(
+                    Icons.attach_file_rounded,
+                    color: AppColors.wisteria,
+                    size: 22,
                   ),
                 ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            GestureDetector(
-              onTap: _hasText ? _sendMessage : null,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: _hasText ? AppColors.sunglow : AppColors.background,
-                  shape: BoxShape.circle,
+                // Expandable text input field.
+                Expanded(
+                  child: Container(
+                    constraints: const BoxConstraints(maxHeight: 120),
+                    decoration: BoxDecoration(
+                      color: AppColors.background,
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: TextField(
+                      controller: _controller,
+                      maxLines: null,
+                      style: const TextStyle(
+                        color: AppColors.darkPurple,
+                        fontSize: 15,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: 'Message…',
+                        hintStyle: TextStyle(
+                          color: AppColors.mutedText.withOpacity(0.8),
+                          fontSize: 15,
+                        ),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-                child: Icon(
-                  _hasText ? Icons.send_rounded : Icons.mic_rounded,
-                  color: _hasText ? AppColors.darkPurple : AppColors.mutedText,
-                  size: 20,
+                const SizedBox(width: 8),
+                // Send button — amber circle when text is present.
+                GestureDetector(
+                  onTap: _hasText ? _sendMessage : null,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: _hasText
+                          ? AppColors.sunglow
+                          : AppColors.background,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      _hasText
+                          ? Icons.send_rounded
+                          : Icons.mic_rounded,
+                      color: _hasText
+                          ? AppColors.darkPurple
+                          : AppColors.mutedText,
+                      size: 20,
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    _scrollController.dispose();
-    super.dispose();
   }
 }
 
 // ─── Message Bubble ───────────────────────────────────────────────────────────
 
+/// Renders a single chat bubble — right-aligned amber for sent,
+/// left-aligned white glass for received.
 class _MessageBubble extends StatelessWidget {
   final Message message;
 
@@ -297,6 +372,7 @@ class _MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isSent = message.isSent;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(
@@ -304,6 +380,7 @@ class _MessageBubble extends StatelessWidget {
             isSent ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
+          // Small avatar shown on the left for received messages.
           if (!isSent)
             Container(
               width: 28,
@@ -326,10 +403,13 @@ class _MessageBubble extends StatelessWidget {
                 ),
               ),
             ),
+          // Bubble + timestamp.
           Column(
-            crossAxisAlignment:
-                isSent ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+            crossAxisAlignment: isSent
+                ? CrossAxisAlignment.end
+                : CrossAxisAlignment.start,
             children: [
+              // Message text bubble.
               Container(
                 constraints: BoxConstraints(
                   maxWidth: MediaQuery.of(context).size.width * 0.72,
@@ -339,14 +419,13 @@ class _MessageBubble extends StatelessWidget {
                   vertical: 10,
                 ),
                 decoration: BoxDecoration(
-                  color: isSent ? AppColors.darkPurple : AppColors.white,
+                  // Sent = amber, received = white glass.
+                  color: isSent ? AppColors.sunglow : AppColors.white,
                   borderRadius: BorderRadius.only(
                     topLeft: const Radius.circular(18),
                     topRight: const Radius.circular(18),
-                    bottomLeft:
-                        Radius.circular(isSent ? 18 : 4),
-                    bottomRight:
-                        Radius.circular(isSent ? 4 : 18),
+                    bottomLeft: Radius.circular(isSent ? 18 : 4),
+                    bottomRight: Radius.circular(isSent ? 4 : 18),
                   ),
                   boxShadow: [
                     BoxShadow(
@@ -360,12 +439,16 @@ class _MessageBubble extends StatelessWidget {
                   message.text,
                   style: TextStyle(
                     fontSize: 15,
-                    color: isSent ? AppColors.white : AppColors.darkPurple,
+                    // Sent bubbles use dark text on amber background.
+                    color: isSent
+                        ? AppColors.darkPurple
+                        : AppColors.darkPurple,
                     height: 1.4,
                   ),
                 ),
               ),
               const SizedBox(height: 3),
+              // Timestamp + read receipt.
               Row(
                 children: [
                   Text(

@@ -4,6 +4,10 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../utils/app_colors.dart';
 
+/// Jobs tab — two-phase UI:
+/// 1. An onboarding wizard (4 steps) to capture role, category, work style,
+///    and experience level.  State is `static` so it persists across tab switches.
+/// 2. A filterable job board with glass cards once onboarding is complete.
 class JobPage extends StatefulWidget {
   const JobPage({super.key});
 
