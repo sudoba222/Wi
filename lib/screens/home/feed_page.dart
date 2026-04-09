@@ -435,17 +435,10 @@ class _MockPostCardState extends State<_MockPostCard> {
                     ],
                   ),
                 ),
-                // Content
+                // Content — expandable caption (Instagram/Telegram style)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-                  child: Text(
-                    d.content,
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: textColor,
-                      height: 1.6,
-                    ),
-                  ),
+                  child: _ExpandableText(text: d.content, isDark: isDark),
                 ),
                 // Optional image
                 if (d.imageUrl != null)
@@ -712,17 +705,10 @@ class _PostCardState extends State<_PostCard> {
                     ],
                   ),
                 ),
-                // Content
+                // Content — expandable caption (Instagram/Telegram style)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-                  child: Text(
-                    post.content,
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: textColor,
-                      height: 1.6,
-                    ),
-                  ),
+                  child: _ExpandableText(text: post.content, isDark: isDark),
                 ),
                 // Separator
                 Container(
@@ -870,6 +856,93 @@ class _AvatarCircle extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ─── Expandable caption text ──────────────────────────────────────────────────
+
+/// Shows up to 3 lines of text with a "more" tap to expand,
+/// and a "Show less" tap to collapse. No toggle shown if text fits in 3 lines.
+class _ExpandableText extends StatefulWidget {
+  final String text;
+  final bool isDark;
+  const _ExpandableText({required this.text, required this.isDark});
+
+  @override
+  State<_ExpandableText> createState() => _ExpandableTextState();
+}
+
+class _ExpandableTextState extends State<_ExpandableText> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor = widget.isDark ? Colors.white : AppColors.darkPurple;
+    const style = TextStyle(fontSize: 15, height: 1.6);
+    final colored = style.copyWith(color: textColor);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Measure if text overflows 3 lines
+        final span = TextSpan(text: widget.text, style: colored);
+        final tp = TextPainter(
+          text: span,
+          maxLines: 3,
+          textDirection: TextDirection.ltr,
+        )..layout(maxWidth: constraints.maxWidth);
+        final overflows = tp.didExceedMaxLines;
+
+        if (!overflows) {
+          // Short text — just render it plainly
+          return Text(widget.text, style: colored);
+        }
+
+        if (_expanded) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(widget.text, style: colored),
+              GestureDetector(
+                onTap: () => setState(() => _expanded = false),
+                child: const Padding(
+                  padding: EdgeInsets.only(top: 4),
+                  child: Text(
+                    'Show less',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.wisteria,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
+
+        // Collapsed — 3 lines + "... more" inline
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(widget.text, maxLines: 3, overflow: TextOverflow.ellipsis, style: colored),
+            GestureDetector(
+              onTap: () => setState(() => _expanded = true),
+              child: const Padding(
+                padding: EdgeInsets.only(top: 4),
+                child: Text(
+                  'more',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.wisteria,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

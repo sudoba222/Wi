@@ -47,9 +47,10 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: AppColors.background,
+      backgroundColor: isDark ? AppColors.darkBg : AppColors.background,
       body: PageWithDrawerCallback(
         onOpenDrawer: openDrawer,
         child: IndexedStack(index: _currentIndex, children: _pages),
