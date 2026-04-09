@@ -4,9 +4,12 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../utils/app_colors.dart';
-import '../../services/global_data.dart';
+// BUG FIX (2026-04-10): PostPage was writing to GlobalData (in-memory) while
+// FeedPage reads from Firestore via PostService — posts never appeared in feed.
+// Fix: replaced GlobalData.addPost() with PostService.createPost() so posts
+// are saved to Firestore and immediately visible in the real-time feed stream.
+import '../../services/post_services.dart';
 import '../../services/auth_services.dart';
-import '../../models/post.dart';
 
 /// Redesigned "Create Post" page.
 /// - Clean full-height text area
@@ -46,27 +49,24 @@ class _PostPageState extends State<PostPage> {
     if (text.isEmpty || _isPosting) return;
     setState(() => _isPosting = true);
 
-    // Get display name from auth if available
-    String authorName = 'You';
-    try {
-      final auth = Provider.of<AuthService>(context, listen: false);
-      if (auth.currentUser?.displayName != null &&
-          auth.currentUser!.displayName!.isNotEmpty) {
-        authorName = auth.currentUser!.displayName!;
-      }
-    } catch (_) {}
+    // Save post to Firestore — PostService handles authorId + author name
+    // from the currently signed-in Firebase user automatically.
+    final success = await PostService().createPost(content: text);
 
-    await Future.delayed(const Duration(milliseconds: 400));
-    GlobalData.addPost(Post(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      authorId: '',
-      author: authorName,
-      content: text,
-      timestamp: DateTime.now(),
-    ));
     if (!mounted) return;
     setState(() => _isPosting = false);
-    Navigator.pop(context);
+
+    if (success) {
+      Navigator.pop(context);
+    } else {
+      // Show error snackbar if Firestore write failed
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to publish. Please try again.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
