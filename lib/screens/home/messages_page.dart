@@ -17,12 +17,32 @@ class MessagesPage extends StatefulWidget {
 }
 
 class _MessagesPageState extends State<MessagesPage> {
-  /// Search query typed into the glass search bar.
   String _searchQuery = '';
 
-  // ── Actions ────────────────────────────────────────────────────────────────
+  // ── Pin logic ──────────────────────────────────────────────────────────────
 
-  /// Opens a search-by-username/email bottom sheet to start a new chat.
+  int get _pinnedCount => GlobalData.conversations.where((c) => c.isPinned).length;
+
+  /// Toggles pin. Shows a snackbar if the user tries to pin a 4th chat.
+  void _togglePin(int originalIndex) {
+    final conv = GlobalData.conversations[originalIndex];
+    if (!conv.isPinned && _pinnedCount >= 3) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('You can pin up to 3 chats only'),
+          backgroundColor: AppColors.darkPurple,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+      return;
+    }
+    setState(() => conv.isPinned = !conv.isPinned);
+  }
+
+  // ── New chat ───────────────────────────────────────────────────────────────
+
+  /// Opens the Firestore user search sheet to start a new conversation.
   void _showNewChatSheet() {
     showModalBottomSheet(
       context: context,
@@ -38,14 +58,13 @@ class _MessagesPageState extends State<MessagesPage> {
     );
   }
 
-  /// Navigates to the ChatScreen for the selected conversation.
-  void _openChat(int index) {
-    final conversation = GlobalData.conversations[index];
+  /// Opens the ChatScreen for the conversation at [originalIndex].
+  void _openChat(int originalIndex) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => ChatScreen(
-          conversation: conversation,
+          conversation: GlobalData.conversations[originalIndex],
           onMessageSent: () => setState(() {}),
         ),
       ),
@@ -57,87 +76,106 @@ class _MessagesPageState extends State<MessagesPage> {
   @override
   Widget build(BuildContext context) {
     final topPad = MediaQuery.of(context).padding.top;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // Filter conversations by search query (case-insensitive name match).
-    final filtered = GlobalData.conversations.where((c) {
-      return _searchQuery.isEmpty ||
-          c.userName.toLowerCase().contains(_searchQuery.toLowerCase());
-    }).toList();
+    // Split into pinned (shown first) and unpinned, both filtered by search
+    final all = GlobalData.conversations;
+    final pinned = all.where((c) => c.isPinned && (
+      _searchQuery.isEmpty || c.userName.toLowerCase().contains(_searchQuery.toLowerCase())
+    )).toList();
+    final unpinned = all.where((c) => !c.isPinned && (
+      _searchQuery.isEmpty || c.userName.toLowerCase().contains(_searchQuery.toLowerCase())
+    )).toList();
 
     return Container(
-      // Gradient background matching the app design system.
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFFF0EAFF), AppColors.background],
+          colors: isDark
+              ? [const Color(0xFF1E0B2C), const Color(0xFF1A0A22)]
+              : [const Color(0xFFF0EAFF), AppColors.background],
         ),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Header ──────────────────────────────────────────────────────
+          // ── Header: title only ─────────────────────────────────────────
           Padding(
-            padding: EdgeInsets.fromLTRB(20, topPad + 12, 16, 0),
-            child: Row(
-              children: [
-                const Text(
-                  'Messages',
-                  style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.darkPurple,
-                  ),
-                ),
-                const Spacer(),
-                // Amber rounded-square FAB for starting a new conversation.
-                GestureDetector(
-                  onTap: _showNewChatSheet,
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: AppColors.sunglow,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.edit_outlined,
-                      color: AppColors.darkPurple,
-                      size: 20,
-                    ),
-                  ),
-                ),
-              ],
+            padding: EdgeInsets.fromLTRB(20, topPad + 14, 20, 0),
+            child: Text(
+              'Messages',
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.w800,
+                color: isDark ? Colors.white : AppColors.darkPurple,
+              ),
             ),
           ),
 
           const SizedBox(height: 12),
 
-          // ── Glass search bar ────────────────────────────────────────────
+          // ── Search bar — tap the "new chat" icon inside to search users ─
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: _GlassSearchBar(
+            child: _SearchBarWithNewChat(
               onChanged: (q) => setState(() => _searchQuery = q),
+              onNewChat: _showNewChatSheet,
+              isDark: isDark,
             ),
           ),
 
           const SizedBox(height: 12),
 
-          // ── Conversation list or empty state ───────────────────────────
+          // ── Pinned section header ──────────────────────────────────────
+          if (pinned.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+              child: Row(
+                children: [
+                  const Icon(Icons.push_pin_rounded, size: 14, color: AppColors.mutedText),
+                  const SizedBox(width: 5),
+                  Text(
+                    'PINNED  ${pinned.length}/3',
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.mutedText, letterSpacing: 0.5),
+                  ),
+                ],
+              ),
+            ),
+
+          // ── Conversation list ──────────────────────────────────────────
           Expanded(
-            child: filtered.isEmpty
-                ? _buildEmptyState()
-                : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-                    itemCount: filtered.length,
-                    itemBuilder: (_, i) {
-                      // Find the original index so _openChat works correctly.
-                      final originalIndex =
-                          GlobalData.conversations.indexOf(filtered[i]);
-                      return _ConversationTile(
-                        conversation: filtered[i],
-                        onTap: () => _openChat(originalIndex),
-                      );
-                    },
+            child: (pinned.isEmpty && unpinned.isEmpty)
+                ? _buildEmptyState(isDark)
+                : ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                    children: [
+                      // Pinned chats first
+                      ...pinned.map((c) {
+                        final idx = all.indexOf(c);
+                        return _ConversationTile(
+                          conversation: c,
+                          isPinned: true,
+                          isDark: isDark,
+                          onTap: () => _openChat(idx),
+                          onTogglePin: () => _togglePin(idx),
+                        );
+                      }),
+                      // Gap between sections if both exist
+                      if (pinned.isNotEmpty && unpinned.isNotEmpty)
+                        const SizedBox(height: 4),
+                      // Unpinned chats
+                      ...unpinned.map((c) {
+                        final idx = all.indexOf(c);
+                        return _ConversationTile(
+                          conversation: c,
+                          isPinned: false,
+                          isDark: isDark,
+                          onTap: () => _openChat(idx),
+                          onTogglePin: () => _togglePin(idx),
+                        );
+                      }),
+                    ],
                   ),
           ),
         ],
@@ -146,7 +184,7 @@ class _MessagesPageState extends State<MessagesPage> {
   }
 
   /// Empty-state view shown when there are no conversations.
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(bool isDark) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -160,10 +198,9 @@ class _MessagesPageState extends State<MessagesPage> {
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: (isDark ? Colors.white : AppColors.wisteria).withOpacity(0.12),
                   borderRadius: BorderRadius.circular(24),
-                  border:
-                      Border.all(color: Colors.white.withOpacity(0.35)),
+                  border: Border.all(color: AppColors.wisteria.withOpacity(0.3)),
                 ),
                 child: const Icon(
                   Icons.chat_bubble_outline_rounded,
@@ -174,20 +211,33 @@ class _MessagesPageState extends State<MessagesPage> {
             ),
           ),
           const SizedBox(height: 20),
-          const Text(
+          Text(
             'No messages yet',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w700,
-              color: AppColors.darkPurple,
+              color: isDark ? Colors.white : AppColors.darkPurple,
             ),
           ),
           const SizedBox(height: 6),
           const Text(
             'Start a conversation',
-            style: TextStyle(
-              fontSize: 14,
-              color: AppColors.mutedText,
+            style: TextStyle(fontSize: 14, color: AppColors.mutedText),
+          ),
+          const SizedBox(height: 24),
+          // Prompt to start a new chat
+          GestureDetector(
+            onTap: _showNewChatSheet,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppColors.sunglow,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Text(
+                'New Conversation',
+                style: TextStyle(color: AppColors.darkPurple, fontWeight: FontWeight.w700, fontSize: 14),
+              ),
             ),
           ),
         ],
@@ -198,11 +248,17 @@ class _MessagesPageState extends State<MessagesPage> {
 
 // ─── Sub-widgets ──────────────────────────────────────────────────────────────
 
-/// Glass-styled search bar with a search icon and clear-on-type feedback.
-class _GlassSearchBar extends StatelessWidget {
+/// Search bar with an inline "new chat" compose icon on the right.
+class _SearchBarWithNewChat extends StatelessWidget {
   final ValueChanged<String> onChanged;
+  final VoidCallback onNewChat;
+  final bool isDark;
 
-  const _GlassSearchBar({required this.onChanged});
+  const _SearchBarWithNewChat({
+    required this.onChanged,
+    required this.onNewChat,
+    required this.isDark,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -212,33 +268,43 @@ class _GlassSearchBar extends StatelessWidget {
         filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.22),
+            color: isDark ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.55),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withOpacity(0.3)),
+            border: Border.all(
+              color: isDark ? Colors.white.withOpacity(0.12) : AppColors.wisteria.withOpacity(0.25),
+            ),
           ),
-          child: TextField(
-            onChanged: onChanged,
-            style: const TextStyle(
-              fontSize: 15,
-              color: AppColors.darkPurple,
-            ),
-            decoration: InputDecoration(
-              hintText: 'Search conversations…',
-              hintStyle: const TextStyle(
-                fontSize: 15,
-                color: AppColors.mutedText,
+          child: Row(
+            children: [
+              // Search field
+              Expanded(
+                child: TextField(
+                  onChanged: onChanged,
+                  style: TextStyle(fontSize: 15, color: isDark ? Colors.white : AppColors.darkPurple),
+                  decoration: InputDecoration(
+                    hintText: 'Search conversations…',
+                    hintStyle: const TextStyle(fontSize: 15, color: AppColors.mutedText),
+                    prefixIcon: const Icon(Icons.search_rounded, color: AppColors.mutedText, size: 20),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
+                  ),
+                ),
               ),
-              prefixIcon: const Icon(
-                Icons.search_rounded,
-                color: AppColors.mutedText,
-                size: 20,
+              // New chat compose button
+              GestureDetector(
+                onTap: onNewChat,
+                child: Container(
+                  margin: const EdgeInsets.only(right: 10),
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: AppColors.sunglow,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.edit_outlined, size: 18, color: AppColors.darkPurple),
+                ),
               ),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(
-                vertical: 14,
-                horizontal: 4,
-              ),
-            ),
+            ],
           ),
         ),
       ),
@@ -246,24 +312,77 @@ class _GlassSearchBar extends StatelessWidget {
   }
 }
 
-/// A single conversation row wrapped in a glass card.
+/// A single conversation row — glass card with pin badge, long-press to pin/unpin.
 class _ConversationTile extends StatelessWidget {
-  final dynamic conversation; // Conversation model from GlobalData.
+  final dynamic conversation;
+  final bool isPinned;
+  final bool isDark;
   final VoidCallback onTap;
+  final VoidCallback onTogglePin;
 
   const _ConversationTile({
     required this.conversation,
+    required this.isPinned,
+    required this.isDark,
     required this.onTap,
+    required this.onTogglePin,
   });
+
+  void _showPinMenu(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkCard : AppColors.white,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Drag handle
+            Center(
+              child: Container(
+                width: 36, height: 4, margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.mutedText.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            ListTile(
+              leading: Icon(
+                isPinned ? Icons.push_pin_outlined : Icons.push_pin_rounded,
+                color: isPinned ? AppColors.mutedText : AppColors.sunglow,
+              ),
+              title: Text(
+                isPinned ? 'Unpin chat' : 'Pin chat',
+                style: TextStyle(
+                  color: isDark ? Colors.white : AppColors.darkPurple,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                onTogglePin();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final initial = (conversation.userName as String).isNotEmpty
-        ? conversation.userName[0].toUpperCase()
-        : '?';
+    final name = conversation.userName as String;
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
 
     return GestureDetector(
       onTap: onTap,
+      onLongPress: () => _showPinMenu(context),
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
         child: ClipRRect(
@@ -273,73 +392,83 @@ class _ConversationTile extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.22),
+                color: isDark
+                    ? (isPinned ? Colors.white.withOpacity(0.1) : Colors.white.withOpacity(0.06))
+                    : (isPinned ? AppColors.sunglow.withOpacity(0.08) : Colors.white.withOpacity(0.55)),
                 borderRadius: BorderRadius.circular(18),
-                border:
-                    Border.all(color: Colors.white.withOpacity(0.3)),
+                border: Border.all(
+                  color: isPinned
+                      ? AppColors.sunglow.withOpacity(0.45)
+                      : (isDark ? Colors.white.withOpacity(0.1) : AppColors.wisteria.withOpacity(0.2)),
+                  width: isPinned ? 1.5 : 1,
+                ),
               ),
               child: Row(
                 children: [
-                  // Gradient avatar with contact initial.
-                  Container(
-                    width: 50,
-                    height: 50,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          AppColors.wisteria,
-                          AppColors.splashPurple,
-                        ],
-                      ),
-                    ),
-                    child: Center(
-                      child: Text(
-                        initial,
-                        style: const TextStyle(
-                          color: AppColors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
+                  // Avatar with optional pin badge
+                  Stack(
+                    children: [
+                      Container(
+                        width: 50, height: 50,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: [AppColors.wisteria, AppColors.splashPurple],
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(initial,
+                            style: const TextStyle(color: AppColors.white, fontSize: 20, fontWeight: FontWeight.bold)),
                         ),
                       ),
-                    ),
+                      // Pin badge — small amber circle with pin icon
+                      if (isPinned)
+                        Positioned(
+                          right: 0, bottom: 0,
+                          child: Container(
+                            width: 18, height: 18,
+                            decoration: const BoxDecoration(
+                              color: AppColors.sunglow,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.push_pin_rounded, size: 11, color: AppColors.darkPurple),
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(width: 14),
-                  // Name + last message preview.
+                  // Name + last message
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          conversation.userName as String,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.darkPurple,
-                          ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(name,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: isDark ? Colors.white : AppColors.darkPurple,
+                                )),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 3),
                         Text(
                           conversation.lastMessage as String,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: AppColors.mutedText,
-                          ),
+                          style: const TextStyle(fontSize: 13, color: AppColors.mutedText),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
                   ),
-                  // Timestamp aligned to the right.
+                  const SizedBox(width: 8),
+                  // Timestamp
                   Text(
                     conversation.lastMessageTime as String,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.mutedText,
-                    ),
+                    style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
                   ),
                 ],
               ),

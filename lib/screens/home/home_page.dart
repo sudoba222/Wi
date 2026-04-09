@@ -113,10 +113,22 @@ class _AppDrawer extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(userProfile?.name ?? 'Your Name', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+                        // Full name — large and bold
+                        Text(userProfile?.name ?? 'Your Name',
+                            style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800)),
+                        const SizedBox(height: 2),
+                        // Job title
                         if (userProfile?.jobTitle?.isNotEmpty == true)
-                          Text(userProfile!.jobTitle!, style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12)),
-                        Text(auth.currentUser?.email ?? '', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11)),
+                          Text(userProfile!.jobTitle!,
+                              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                        // Company
+                        if (userProfile?.company?.isNotEmpty == true)
+                          Text(userProfile!.company!,
+                              style: TextStyle(color: Colors.white.withOpacity(0.75), fontSize: 12)),
+                        const SizedBox(height: 2),
+                        // Email in smaller muted text
+                        Text(auth.currentUser?.email ?? '',
+                            style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11)),
                       ],
                     ),
                   ),
@@ -128,16 +140,6 @@ class _AppDrawer extends StatelessWidget {
               child: ListView(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 children: [
-                  // Navigation shortcuts
-                  _Tile(icon: Icons.home_rounded, label: lang.t('feed'), textColor: text, onTap: () => Navigator.pop(context)),
-                  _Tile(icon: Icons.chat_bubble_outline_rounded, label: lang.t('messages'), textColor: text, onTap: () => Navigator.pop(context)),
-                  _Tile(icon: Icons.person_outline_rounded, label: lang.t('profile'), textColor: text, onTap: () {
-                    Navigator.pop(context);
-                    if (userProfile != null) Navigator.push(context, MaterialPageRoute(builder: (_) => ProfilePage(userProfile: userProfile!)));
-                  }),
-
-                  _Div(isDark: isDark),
-
                   // Dark mode toggle
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
