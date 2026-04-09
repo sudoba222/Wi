@@ -7,7 +7,7 @@ import 'firebase_options.dart';
 import 'services/auth_services.dart';
 import 'providers/theme_provider.dart';
 import 'providers/language_provider.dart';
-import 'screens/auth/auth_wrapper.dart';
+import 'screens/splash/splash_page.dart';
 import 'utils/app_colors.dart';
 
 void main() async {
@@ -61,7 +61,7 @@ class WiApp extends StatelessWidget {
               scaffoldBackgroundColor: const Color(0xFF1A0A22),
               cardColor: const Color(0xFF2D1040),
             ),
-            home: const AuthWrapper(),
+            home: const SplashPage(),
           );
         },
       ),
