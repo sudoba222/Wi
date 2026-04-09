@@ -230,14 +230,18 @@ class _ChatScreenState extends State<ChatScreen> {
     final name = widget.conversation.userName;
     final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       // Gradient background matching the app design system.
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFFF0EAFF), AppColors.background],
+            colors: isDark
+                ? [const Color(0xFF1E0B2C), AppColors.darkBg]
+                : [const Color(0xFFF0EAFF), AppColors.background],
           ),
         ),
         child: Column(
@@ -269,6 +273,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildAppBar(
       BuildContext context, String name, String initial) {
     final topPad = MediaQuery.of(context).padding.top;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return ClipRect(
       child: BackdropFilter(
         // Subtle blur on the header background.
@@ -276,10 +281,14 @@ class _ChatScreenState extends State<ChatScreen> {
         child: Container(
           padding: EdgeInsets.fromLTRB(4, topPad + 4, 4, 4),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.72),
+            color: isDark
+                ? Colors.white.withOpacity(0.08)
+                : Colors.white.withOpacity(0.72),
             border: Border(
               bottom: BorderSide(
-                color: Colors.white.withOpacity(0.4),
+                color: isDark
+                    ? Colors.white.withOpacity(0.12)
+                    : Colors.white.withOpacity(0.4),
                 width: 1,
               ),
             ),
@@ -289,9 +298,9 @@ class _ChatScreenState extends State<ChatScreen> {
               // Back button.
               IconButton(
                 onPressed: () => Navigator.pop(context),
-                icon: const Icon(
+                icon: Icon(
                   Icons.arrow_back_ios_rounded,
-                  color: AppColors.darkPurple,
+                  color: isDark ? Colors.white : AppColors.darkPurple,
                   size: 20,
                 ),
               ),
@@ -327,8 +336,8 @@ class _ChatScreenState extends State<ChatScreen> {
                   children: [
                     Text(
                       name,
-                      style: const TextStyle(
-                        color: AppColors.darkPurple,
+                      style: TextStyle(
+                        color: isDark ? Colors.white : AppColors.darkPurple,
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
                       ),
@@ -352,7 +361,8 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               IconButton(
                 onPressed: () {},
-                icon: const Icon(Icons.more_vert_rounded, color: AppColors.darkPurple),
+                icon: Icon(Icons.more_vert_rounded,
+                    color: isDark ? Colors.white : AppColors.darkPurple),
               ),
             ],
           ),
@@ -363,6 +373,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   /// Empty state shown when no messages exist in the conversation.
   Widget _buildEmptyState(String name) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -384,10 +395,10 @@ class _ChatScreenState extends State<ChatScreen> {
           const SizedBox(height: 16),
           Text(
             'Say hi to $name!',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 17,
               fontWeight: FontWeight.w700,
-              color: AppColors.darkPurple,
+              color: isDark ? Colors.white : AppColors.darkPurple,
             ),
           ),
           const SizedBox(height: 6),
@@ -501,7 +512,7 @@ class _ChatScreenState extends State<ChatScreen> {
 // ─── Message Bubble ───────────────────────────────────────────────────────────
 
 /// Renders a single chat bubble — right-aligned amber for sent,
-/// left-aligned white glass for received.
+/// left-aligned glass/card for received.
 class _MessageBubble extends StatelessWidget {
   final Message message;
 
@@ -510,6 +521,16 @@ class _MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isSent = message.isSent;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // Received bubble: white in light mode, darkCard in dark mode
+    final receivedColor =
+        isDark ? AppColors.darkCard : AppColors.white;
+    // Sent bubble: always amber
+    final sentColor = AppColors.sunglow;
+    // Text color for received: white in dark, darkPurple in light
+    final receivedTextColor =
+        isDark ? Colors.white : AppColors.darkPurple;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
@@ -557,14 +578,17 @@ class _MessageBubble extends StatelessWidget {
                   vertical: 10,
                 ),
                 decoration: BoxDecoration(
-                  // Sent = amber, received = white glass.
-                  color: isSent ? AppColors.sunglow : AppColors.white,
+                  color: isSent ? sentColor : receivedColor,
                   borderRadius: BorderRadius.only(
                     topLeft: const Radius.circular(18),
                     topRight: const Radius.circular(18),
                     bottomLeft: Radius.circular(isSent ? 18 : 4),
                     bottomRight: Radius.circular(isSent ? 4 : 18),
                   ),
+                  border: (!isSent && isDark)
+                      ? Border.all(
+                          color: Colors.white.withOpacity(0.1), width: 1)
+                      : null,
                   boxShadow: [
                     BoxShadow(
                       color: AppColors.darkPurple.withOpacity(0.08),
@@ -577,17 +601,17 @@ class _MessageBubble extends StatelessWidget {
                   message.text,
                   style: TextStyle(
                     fontSize: 15,
-                    // Sent bubbles use dark text on amber background.
-                    color: isSent
-                        ? AppColors.darkPurple
-                        : AppColors.darkPurple,
+                    color: isSent ? AppColors.darkPurple : receivedTextColor,
                     height: 1.4,
                   ),
                 ),
               ),
               const SizedBox(height: 3),
-              // Timestamp + read receipt.
+              // Timestamp + read receipt — aligned to bubble side.
               Row(
+                mainAxisAlignment: isSent
+                    ? MainAxisAlignment.end
+                    : MainAxisAlignment.start,
                 children: [
                   Text(
                     message.time,

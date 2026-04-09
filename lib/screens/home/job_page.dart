@@ -247,6 +247,7 @@ class _JobPageState extends State<JobPage> {
 
   Widget _buildJobBoard(BuildContext context) {
     final filters = ['All', 'Remote', 'Full-time', 'Part-time', 'Contract'];
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final filtered = _activeFilter == 'All'
         ? _jobs
@@ -257,17 +258,19 @@ class _JobPageState extends State<JobPage> {
 
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFFF0EAFF), AppColors.background],
+            colors: isDark
+                ? [const Color(0xFF1E0B2C), AppColors.darkBg]
+                : [const Color(0xFFF0EAFF), AppColors.background],
           ),
         ),
         child: CustomScrollView(
           slivers: [
-            SliverToBoxAdapter(child: _buildBoardHeader(context)),
-            SliverToBoxAdapter(child: _buildFilters(filters)),
+            SliverToBoxAdapter(child: _buildBoardHeader(context, isDark)),
+            SliverToBoxAdapter(child: _buildFilters(filters, isDark)),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
               sliver: SliverList(
@@ -288,8 +291,9 @@ class _JobPageState extends State<JobPage> {
     );
   }
 
-  Widget _buildBoardHeader(BuildContext context) {
+  Widget _buildBoardHeader(BuildContext context, bool isDark) {
     final topPad = MediaQuery.of(context).padding.top;
+    final textColor = isDark ? Colors.white : AppColors.darkPurple;
     return Padding(
       padding: EdgeInsets.only(
         top: topPad + 12,
@@ -303,19 +307,19 @@ class _JobPageState extends State<JobPage> {
           Row(
             children: [
               IconButton(
-                icon: const Icon(Icons.arrow_back_ios_rounded, color: AppColors.darkPurple, size: 20),
+                icon: Icon(Icons.arrow_back_ios_rounded, color: textColor, size: 20),
                 onPressed: () => Navigator.pop(context),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
               ),
               const SizedBox(width: 8),
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Jobs for You',
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.darkPurple,
+                    color: textColor,
                     letterSpacing: -0.3,
                   ),
                 ),
@@ -328,11 +332,16 @@ class _JobPageState extends State<JobPage> {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.55),
+                      color: isDark
+                          ? Colors.white.withOpacity(0.08)
+                          : Colors.white.withOpacity(0.55),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white.withOpacity(0.7)),
+                      border: Border.all(
+                          color: isDark
+                              ? Colors.white.withOpacity(0.12)
+                              : Colors.white.withOpacity(0.7)),
                     ),
-                    child: const Icon(Icons.tune_rounded, color: AppColors.darkPurple, size: 20),
+                    child: Icon(Icons.tune_rounded, color: textColor, size: 20),
                   ),
                 ),
               ),
@@ -353,7 +362,7 @@ class _JobPageState extends State<JobPage> {
     );
   }
 
-  Widget _buildFilters(List<String> filters) {
+  Widget _buildFilters(List<String> filters, bool isDark) {
     return SizedBox(
       height: 52,
       child: ListView.builder(
@@ -370,11 +379,15 @@ class _JobPageState extends State<JobPage> {
               margin: const EdgeInsets.only(right: 8),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               decoration: BoxDecoration(
-                color: isActive ? AppColors.darkPurple : Colors.white.withOpacity(0.65),
+                color: isActive
+                    ? (isDark ? AppColors.wisteria : AppColors.darkPurple)
+                    : (isDark
+                        ? Colors.white.withOpacity(0.08)
+                        : Colors.white.withOpacity(0.65)),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: isActive
-                      ? AppColors.darkPurple
+                      ? (isDark ? AppColors.wisteria : AppColors.darkPurple)
                       : AppColors.mutedText.withOpacity(0.25),
                 ),
               ),
@@ -383,7 +396,9 @@ class _JobPageState extends State<JobPage> {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: isActive ? AppColors.sunglow : AppColors.mutedText,
+                  color: isActive
+                      ? (isDark ? AppColors.darkPurple : AppColors.sunglow)
+                      : AppColors.mutedText,
                 ),
               ),
             ),
@@ -1009,6 +1024,15 @@ class _JobCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final logoColor = Color(job['color'] as int);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark
+        ? Colors.white.withOpacity(0.06)
+        : Colors.white.withOpacity(0.75);
+    final borderColor = isDark
+        ? AppColors.wisteria.withOpacity(0.25)
+        : Colors.white.withOpacity(0.6);
+    final textColor = isDark ? Colors.white : AppColors.darkPurple;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       child: GestureDetector(
@@ -1019,12 +1043,9 @@ class _JobCard extends StatelessWidget {
             filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.75),
+                color: cardColor,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.6),
-                  width: 1,
-                ),
+                border: Border.all(color: borderColor, width: 1),
                 boxShadow: [
                   BoxShadow(
                     color: AppColors.wisteria.withOpacity(0.07),
@@ -1099,10 +1120,10 @@ class _JobCard extends StatelessWidget {
                   // Title
                   Text(
                     job['title'] as String,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.w800,
-                      color: AppColors.darkPurple,
+                      color: textColor,
                     ),
                   ),
                   const SizedBox(height: 8),

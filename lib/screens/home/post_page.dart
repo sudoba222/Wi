@@ -2,13 +2,17 @@
 
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../utils/app_colors.dart';
 import '../../services/global_data.dart';
+import '../../services/auth_services.dart';
 import '../../models/post.dart';
 
-/// Full-screen compose + preview page.
-/// Top: glass compose card.
-/// Below: Instagram-style sample post cards showing the format.
+/// Redesigned "Create Post" page.
+/// - Clean full-height text area
+/// - Publish button (amber when text present, greyed when empty)
+/// - Author row with globe + Public audience pill
+/// - Pinned bottom toolbar: media icons + character counter
 class PostPage extends StatefulWidget {
   const PostPage({super.key});
 
@@ -20,22 +24,43 @@ class _PostPageState extends State<PostPage> {
   final _contentController = TextEditingController();
   bool _isPosting = false;
 
+  static const int _maxChars = 2000;
+
+  int get _charCount => _contentController.text.length;
+  bool get _hasText => _contentController.text.trim().isNotEmpty;
+
+  @override
+  void initState() {
+    super.initState();
+    _contentController.addListener(() => setState(() {}));
+  }
+
   @override
   void dispose() {
     _contentController.dispose();
     super.dispose();
   }
 
-  /// Creates a new post in GlobalData and pops back to the feed.
-  Future<void> _createPost() async {
+  Future<void> _publish() async {
     final text = _contentController.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || _isPosting) return;
     setState(() => _isPosting = true);
-    await Future.delayed(const Duration(milliseconds: 600));
+
+    // Get display name from auth if available
+    String authorName = 'You';
+    try {
+      final auth = Provider.of<AuthService>(context, listen: false);
+      if (auth.currentUser?.displayName != null &&
+          auth.currentUser!.displayName!.isNotEmpty) {
+        authorName = auth.currentUser!.displayName!;
+      }
+    } catch (_) {}
+
+    await Future.delayed(const Duration(milliseconds: 400));
     GlobalData.addPost(Post(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       authorId: '',
-      author: 'You',
+      author: authorName,
       content: text,
       timestamp: DateTime.now(),
     ));
@@ -48,325 +73,288 @@ class _PostPageState extends State<PostPage> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final topPad = MediaQuery.of(context).padding.top;
+    final bottomPad = MediaQuery.of(context).padding.bottom;
 
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: isDark
-              ? [const Color(0xFF1E0B2C), AppColors.darkBg]
-              : [const Color(0xFFF0EAFF), AppColors.background],
-        ),
-      ),
-      child: SafeArea(
-        child: Column(
-          children: [
-            // ── Top bar ──────────────────────────────────────────────────────
-            Padding(
-              padding: EdgeInsets.fromLTRB(8, topPad > 0 ? 4 : 12, 8, 0),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: Icon(Icons.arrow_back_ios_rounded,
-                        color: isDark ? Colors.white : AppColors.darkPurple, size: 20),
-                    onPressed: () => Navigator.pop(context),
+    final bgColor = isDark ? AppColors.darkBg : AppColors.background;
+    final textColor = isDark ? Colors.white : AppColors.darkPurple;
+
+    return Scaffold(
+      backgroundColor: bgColor,
+      body: Column(
+        children: [
+          // ── Top bar ─────────────────────────────────────────────────────────
+          _buildTopBar(context, topPad, isDark, textColor),
+
+          // ── Author row ───────────────────────────────────────────────────────
+          _buildAuthorRow(isDark, textColor),
+
+          // ── Scrollable text area (flex expands) ──────────────────────────────
+          Expanded(
+            child: Material(
+              type: MaterialType.transparency,
+              child: TextField(
+                controller: _contentController,
+                maxLines: null,
+                expands: true,
+                maxLength: _maxChars,
+                buildCounter: (_, {required currentLength, required isFocused, maxLength}) =>
+                    const SizedBox.shrink(), // hide default counter — we show our own
+                textAlignVertical: TextAlignVertical.top,
+                style: TextStyle(
+                  fontSize: 17,
+                  height: 1.65,
+                  color: textColor,
+                ),
+                decoration: InputDecoration(
+                  hintText: "What's on your mind?",
+                  hintStyle: TextStyle(
+                    fontSize: 17,
+                    color: AppColors.mutedText.withOpacity(0.8),
+                    height: 1.65,
                   ),
-                  Expanded(
-                    child: Text(
-                      'Create Post',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : AppColors.darkPurple,
-                      ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: _PostButton(isPosting: _isPosting, onTap: _createPost),
-                  ),
-                ],
+                  border: InputBorder.none,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                ),
               ),
             ),
+          ),
 
-            const SizedBox(height: 12),
-
-            // ── Scrollable body: compose card + sample posts ─────────────────
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
-                children: [
-                  // Glass compose card
-                  _GlassCard(
-                    isDark: isDark,
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _AuthorRow(isDark: isDark),
-                          const SizedBox(height: 16),
-                          // Material(transparency) fixes "No Material ancestor" error
-                          // that occurs when TextField is inside BackdropFilter/ClipRRect.
-                          Material(
-                            type: MaterialType.transparency,
-                            child: TextField(
-                              controller: _contentController,
-                              maxLines: 4,
-                              style: TextStyle(
-                                fontSize: 16, height: 1.5,
-                                color: isDark ? Colors.white : AppColors.darkPurple,
-                              ),
-                              decoration: const InputDecoration(
-                                hintText: "What's on your mind?",
-                                hintStyle: TextStyle(fontSize: 16, color: AppColors.mutedText),
-                                border: InputBorder.none,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          _MediaToolbar(),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // Section label
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Text(
-                      'POST PREVIEW',
-                      style: TextStyle(
-                        fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.8,
-                        color: isDark ? Colors.white38 : AppColors.mutedText,
-                      ),
-                    ),
-                  ),
-
-                  // ── Sample posts ─────────────────────────────────────────
-                  ..._samplePosts.map((p) => _SamplePostCard(post: p, isDark: isDark)),
-                ],
-              ),
-            ),
-          ],
-        ),
+          // ── Bottom toolbar — pinned ──────────────────────────────────────────
+          _buildBottomToolbar(isDark, bottomPad),
+        ],
       ),
     );
   }
-}
 
-// ─── Sample post data ──────────────────────────────────────────────────────────
-
-class _PostData {
-  final String author;
-  final String role;
-  final String initial;
-  final String? imageUrl;
-  final String caption;
-  final int likes;
-  final int comments;
-  final String time;
-
-  const _PostData({
-    required this.author, required this.role, required this.initial,
-    this.imageUrl, required this.caption, required this.likes,
-    required this.comments, required this.time,
-  });
-}
-
-const _samplePosts = [
-  _PostData(
-    author: 'Alisher Nazarov',
-    role: 'Senior Software Engineer · Dushanbe',
-    initial: 'A',
-    imageUrl: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800&q=80',
-    caption: 'Shipped our new dashboard today! 🚀 Six months of work, countless late nights, and now watching real users love it. Proud of the whole team. #Flutter #MobileFirst #TajikTech',
-    likes: 142,
-    comments: 18,
-    time: '2h ago',
-  ),
-  _PostData(
-    author: 'Nargis Rahimova',
-    role: 'UX Designer · Khujand',
-    initial: 'N',
-    imageUrl: 'https://images.unsplash.com/photo-1561070791-2526d30994b5?w=800&q=80',
-    caption: 'Design isn\'t just how it looks — it\'s how it works. Presented our new design system to the team today. Every component built with Tajik users in mind. #UX #DesignThinking',
-    likes: 89,
-    comments: 11,
-    time: '5h ago',
-  ),
-  _PostData(
-    author: 'Rustam Karimov',
-    role: 'Product Manager · Dushanbe',
-    initial: 'R',
-    imageUrl: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&q=80',
-    caption: 'Our team just crossed 10,000 active users! 🎉 Building a product people actually use is the best feeling. Grateful for every person who gave feedback. The journey is just starting.',
-    likes: 211,
-    comments: 34,
-    time: '1d ago',
-  ),
-  _PostData(
-    author: 'Zarina Muhammadova',
-    role: 'Data Analyst · Bokhtar',
-    initial: 'Z',
-    imageUrl: null,
-    caption: 'Just completed the Google Data Analytics Certificate! 📊 Three months of nights and weekends. If you\'re thinking about upskilling — just start. Consistency beats everything. #DataScience #Tajikistan',
-    likes: 67,
-    comments: 9,
-    time: '2d ago',
-  ),
-];
-
-// ─── Sub-widgets ──────────────────────────────────────────────────────────────
-
-/// Instagram-style post card in our glass/purple theme.
-class _SamplePostCard extends StatefulWidget {
-  final _PostData post;
-  final bool isDark;
-  const _SamplePostCard({required this.post, required this.isDark});
-
-  @override
-  State<_SamplePostCard> createState() => _SamplePostCardState();
-}
-
-class _SamplePostCardState extends State<_SamplePostCard> {
-  bool _liked = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = widget.post;
-    final isDark = widget.isDark;
-    final cardColor = isDark ? Colors.white.withOpacity(0.06) : Colors.white.withOpacity(0.7);
-    final borderColor = isDark ? Colors.white.withOpacity(0.1) : AppColors.wisteria.withOpacity(0.2);
-    final textColor = isDark ? Colors.white : AppColors.darkPurple;
-
+  Widget _buildTopBar(
+    BuildContext context,
+    double topPad,
+    bool isDark,
+    Color textColor,
+  ) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-          child: Container(
-            decoration: BoxDecoration(
-              color: cardColor,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: borderColor),
+      padding: EdgeInsets.only(
+        top: topPad + 8,
+        left: 4,
+        right: 12,
+        bottom: 8,
+      ),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkBg : AppColors.background,
+        border: Border(
+          bottom: BorderSide(
+            color: isDark
+                ? Colors.white.withOpacity(0.08)
+                : AppColors.wisteria.withOpacity(0.15),
+            width: 1,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          // Back arrow
+          IconButton(
+            icon: Icon(
+              Icons.arrow_back_ios_rounded,
+              color: textColor,
+              size: 20,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ── Author header ──────────────────────────────────────────
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
-                  child: Row(
-                    children: [
-                      // Gradient avatar
-                      Container(
-                        width: 42, height: 42,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: LinearGradient(colors: [AppColors.wisteria, AppColors.splashPurple]),
+            onPressed: () => Navigator.pop(context),
+          ),
+          // Title
+          Expanded(
+            child: Text(
+              'Create Post',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+                color: textColor,
+              ),
+            ),
+          ),
+          // Publish button — amber when text entered, grey when empty
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            child: GestureDetector(
+              onTap: _hasText && !_isPosting ? _publish : null,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+                decoration: BoxDecoration(
+                  color: _hasText
+                      ? AppColors.sunglow
+                      : AppColors.mutedText.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: _isPosting
+                    ? SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: isDark ? Colors.white : AppColors.darkPurple,
                         ),
-                        child: Center(
-                          child: Text(p.initial,
-                            style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700)),
+                      )
+                    : Text(
+                        'Publish',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: _hasText
+                              ? AppColors.darkPurple
+                              : AppColors.mutedText,
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(p.author,
-                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: textColor)),
-                            Text(p.role,
-                              style: const TextStyle(fontSize: 11, color: AppColors.mutedText),
-                              maxLines: 1, overflow: TextOverflow.ellipsis),
-                          ],
-                        ),
-                      ),
-                      Text(p.time, style: const TextStyle(fontSize: 11, color: AppColors.mutedText)),
-                      const SizedBox(width: 8),
-                      Icon(Icons.more_horiz_rounded, color: AppColors.mutedText, size: 20),
-                    ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAuthorRow(bool isDark, Color textColor) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      child: Row(
+        children: [
+          // Gradient avatar
+          Container(
+            width: 46,
+            height: 46,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [AppColors.wisteria, AppColors.splashPurple],
+              ),
+            ),
+            child: const Center(
+              child: Text(
+                'Y',
+                style: TextStyle(
+                  color: AppColors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'You',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: textColor,
+                ),
+              ),
+              const SizedBox(height: 4),
+              // Public pill with globe icon
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.wisteria.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppColors.wisteria.withOpacity(0.3),
+                    width: 1,
                   ),
                 ),
-
-                // ── Photo (if any) ─────────────────────────────────────────
-                if (p.imageUrl != null)
-                  ClipRRect(
-                    child: Image.network(
-                      p.imageUrl!,
-                      width: double.infinity,
-                      height: 220,
-                      fit: BoxFit.cover,
-                      loadingBuilder: (_, child, progress) => progress == null
-                          ? child
-                          : Container(
-                              height: 220,
-                              color: AppColors.wisteria.withOpacity(0.1),
-                              child: const Center(
-                                child: CircularProgressIndicator(color: AppColors.wisteria, strokeWidth: 2),
-                              ),
-                            ),
-                      errorBuilder: (_, __, ___) => Container(
-                        height: 160,
-                        color: AppColors.wisteria.withOpacity(0.08),
-                        child: const Center(
-                          child: Icon(Icons.image_outlined, color: AppColors.wisteria, size: 40),
-                        ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.public_rounded,
+                      size: 13,
+                      color: AppColors.splashPurple,
+                    ),
+                    const SizedBox(width: 4),
+                    const Text(
+                      'Public',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.splashPurple,
                       ),
                     ),
-                  ),
-
-                // ── Caption ────────────────────────────────────────────────
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
-                  child: Text(
-                    p.caption,
-                    style: TextStyle(fontSize: 14, color: textColor, height: 1.45),
-                  ),
+                    const SizedBox(width: 3),
+                    Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      size: 14,
+                      color: AppColors.splashPurple,
+                    ),
+                  ],
                 ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
-                // ── Action row ─────────────────────────────────────────────
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 6, 10, 12),
-                  child: Row(
-                    children: [
-                      // Like
-                      _ActionBtn(
-                        icon: _liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                        label: '${p.likes + (_liked ? 1 : 0)}',
-                        color: _liked ? Colors.redAccent : AppColors.mutedText,
-                        onTap: () => setState(() => _liked = !_liked),
-                      ),
-                      const SizedBox(width: 4),
-                      // Comment
-                      _ActionBtn(
-                        icon: Icons.chat_bubble_outline_rounded,
-                        label: '${p.comments}',
-                        color: AppColors.mutedText,
-                        onTap: () {},
-                      ),
-                      const SizedBox(width: 4),
-                      // Repost / Share
-                      _ActionBtn(
-                        icon: Icons.repeat_rounded,
-                        label: 'Share',
-                        color: AppColors.mutedText,
-                        onTap: () {},
-                      ),
-                      const Spacer(),
-                      // Bookmark
-                      Icon(Icons.bookmark_border_rounded, size: 20, color: AppColors.mutedText),
-                    ],
-                  ),
-                ),
-              ],
+  Widget _buildBottomToolbar(bool isDark, double bottomPad) {
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 10,
+            bottom: 10 + bottomPad,
+          ),
+          decoration: BoxDecoration(
+            color: isDark
+                ? Colors.white.withOpacity(0.06)
+                : Colors.white.withOpacity(0.8),
+            border: Border(
+              top: BorderSide(
+                color: isDark
+                    ? Colors.white.withOpacity(0.1)
+                    : AppColors.wisteria.withOpacity(0.2),
+                width: 1,
+              ),
             ),
+          ),
+          child: Row(
+            children: [
+              // Media icons
+              _ToolbarIcon(
+                  icon: Icons.image_outlined, onTap: () {}),
+              const SizedBox(width: 4),
+              _ToolbarIcon(
+                  icon: Icons.videocam_outlined, onTap: () {}),
+              const SizedBox(width: 4),
+              _ToolbarIcon(
+                  icon: Icons.person_add_outlined, onTap: () {}),
+              const SizedBox(width: 4),
+              _ToolbarIcon(
+                  icon: Icons.location_on_outlined, onTap: () {}),
+              const Spacer(),
+              // Character counter
+              Text(
+                '$_charCount/$_maxChars',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: _charCount > _maxChars * 0.9
+                      ? (_charCount >= _maxChars
+                          ? Colors.red
+                          : Colors.orange)
+                      : AppColors.mutedText,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -374,167 +362,27 @@ class _SamplePostCardState extends State<_SamplePostCard> {
   }
 }
 
-/// Icon + label action button for the post card toolbar.
-class _ActionBtn extends StatelessWidget {
+/// Toolbar icon button — wisteria color.
+class _ToolbarIcon extends StatelessWidget {
   final IconData icon;
-  final String label;
-  final Color color;
   final VoidCallback onTap;
 
-  const _ActionBtn({required this.icon, required this.label, required this.color, required this.onTap});
+  const _ToolbarIcon({required this.icon, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-        child: Row(
-          children: [
-            Icon(icon, size: 20, color: color),
-            const SizedBox(width: 4),
-            Text(label, style: TextStyle(fontSize: 13, color: color, fontWeight: FontWeight.w500)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Amber pill "Post" button.
-class _PostButton extends StatelessWidget {
-  final bool isPosting;
-  final VoidCallback onTap;
-  const _PostButton({required this.isPosting, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: isPosting ? null : onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        decoration: BoxDecoration(
-          color: isPosting ? AppColors.sunglow.withOpacity(0.5) : AppColors.sunglow,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: isPosting
-            ? const SizedBox(width: 16, height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.darkPurple))
-            : const Text('Post',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.darkPurple)),
-      ),
-    );
-  }
-}
-
-/// Gradient avatar circle + display name row at the top of the compose card.
-class _AuthorRow extends StatelessWidget {
-  final bool isDark;
-  const _AuthorRow({required this.isDark});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 44, height: 44,
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(colors: [AppColors.wisteria, AppColors.splashPurple]),
-          ),
-          child: const Center(child: Text('Y', style: TextStyle(color: AppColors.white, fontSize: 18, fontWeight: FontWeight.bold))),
-        ),
-        const SizedBox(width: 12),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('You', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700,
-                color: isDark ? Colors.white : AppColors.darkPurple)),
-            Container(
-              margin: const EdgeInsets.only(top: 3),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppColors.wisteria.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Text('Anyone', style: TextStyle(fontSize: 11, color: AppColors.splashPurple, fontWeight: FontWeight.w600)),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-/// Bottom attachment-type pills: Photo / Video / Location (UI only).
-class _MediaToolbar extends StatelessWidget {
-  const _MediaToolbar();
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        _AttachPill(icon: Icons.image_outlined, label: 'Photo'),
-        const SizedBox(width: 10),
-        _AttachPill(icon: Icons.videocam_outlined, label: 'Video'),
-        const SizedBox(width: 10),
-        _AttachPill(icon: Icons.location_on_outlined, label: 'Location'),
-      ],
-    );
-  }
-}
-
-class _AttachPill extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  const _AttachPill({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {},
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        width: 40,
+        height: 40,
         decoration: BoxDecoration(
-          color: AppColors.wisteria.withOpacity(0.12),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.wisteria.withOpacity(0.25)),
+          borderRadius: BorderRadius.circular(10),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 16, color: AppColors.splashPurple),
-            const SizedBox(width: 5),
-            Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.darkPurple)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Glassmorphism card wrapper.
-class _GlassCard extends StatelessWidget {
-  final Widget child;
-  final bool isDark;
-  const _GlassCard({required this.child, required this.isDark});
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(20),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
-          decoration: BoxDecoration(
-            color: isDark ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.6),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: isDark ? Colors.white.withOpacity(0.12) : AppColors.wisteria.withOpacity(0.25),
-            ),
-          ),
-          child: child,
+        child: Icon(
+          icon,
+          size: 24,
+          color: AppColors.wisteria,
         ),
       ),
     );

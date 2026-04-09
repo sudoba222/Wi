@@ -14,6 +14,70 @@ import '../profile/profile_page.dart';
 import 'home_page.dart';
 import 'job_page.dart';
 
+// ─── Mock post data ────────────────────────────────────────────────────────────
+
+class _MockPost {
+  final String author;
+  final String role;
+  final String initial;
+  final String content;
+  final String? imageUrl;
+  final int likes;
+  final int comments;
+  final String timeAgo;
+
+  const _MockPost({
+    required this.author,
+    required this.role,
+    required this.initial,
+    required this.content,
+    this.imageUrl,
+    required this.likes,
+    required this.comments,
+    required this.timeAgo,
+  });
+}
+
+const _mockPosts = [
+  _MockPost(
+    author: 'Alisher N.',
+    role: 'Flutter Developer · Alif.tj',
+    initial: 'A',
+    content:
+        'Just shipped a brand-new feature to production — real-time analytics built entirely in Flutter. Six months of late nights, dozens of code reviews, and one very patient team. Watching real users interact with it in the first hour was worth every minute. This is why we build. 🚀 #Flutter #TajikTech #MobileFirst',
+    imageUrl:
+        'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=600&q=80',
+    likes: 42,
+    comments: 8,
+    timeAgo: '1h ago',
+  ),
+  _MockPost(
+    author: 'Nargis R.',
+    role: 'UX Designer · Freelance',
+    initial: 'N',
+    content:
+        'Design systems are not just component libraries — they are a shared language. Spent the last week documenting every spacing decision, typography scale, and interaction pattern in our product. The result: a team that ships faster and a product that looks like one person designed it. #UX #DesignSystem #ProductDesign',
+    imageUrl: null,
+    likes: 28,
+    comments: 5,
+    timeAgo: '3h ago',
+  ),
+  _MockPost(
+    author: 'Rustam K.',
+    role: 'Product Manager · TechHub TJ',
+    initial: 'R',
+    content:
+        'We are hiring! Looking for a senior Flutter developer to join our growing team in Dushanbe. Competitive salary, remote-friendly, and the chance to build products used by thousands across Tajikistan. DM me or apply via the link below. Referrals welcome! 🙌 #Hiring #Flutter #Dushanbe',
+    imageUrl:
+        'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=600&q=80',
+    likes: 67,
+    comments: 14,
+    timeAgo: '6h ago',
+  ),
+];
+
+// ─── Feed Page ────────────────────────────────────────────────────────────────
+
 class FeedPage extends StatefulWidget {
   const FeedPage({super.key});
 
@@ -41,68 +105,55 @@ class _FeedPageState extends State<FeedPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final auth = Provider.of<AuthService>(context, listen: false);
     final currentUser = auth.currentUser;
 
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFFF0EAFF),
-            AppColors.background,
-          ],
+          colors: isDark
+              ? [const Color(0xFF1E0B2C), AppColors.darkBg]
+              : [const Color(0xFFF0EAFF), AppColors.background],
         ),
       ),
       child: Column(
         children: [
-          _buildHeader(context),
+          _buildHeader(context, isDark),
           Expanded(
             child: StreamBuilder<List<Post>>(
               stream: _postService.getPostsStream(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        SizedBox(
-                          width: 40,
-                          height: 40,
-                          child: CircularProgressIndicator(
-                            color: AppColors.wisteria,
-                            strokeWidth: 2.5,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Loading feed…',
-                          style: TextStyle(
-                            color: AppColors.mutedText,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
+                  return _buildLoadingState();
                 }
-                final posts = snapshot.data ?? [];
-                if (posts.isEmpty) {
-                  return _buildEmptyState();
-                }
+                final firestorePosts = snapshot.data ?? [];
                 return RefreshIndicator(
                   color: AppColors.wisteria,
-                  backgroundColor: AppColors.white,
+                  backgroundColor: isDark ? AppColors.darkCard : AppColors.white,
                   onRefresh: () async => setState(() {}),
                   child: ListView.builder(
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-                    itemCount: posts.length,
-                    itemBuilder: (context, i) => _PostCard(
-                      post: posts[i],
-                      currentUserId: currentUser?.uid ?? '',
-                      postService: _postService,
-                    ),
+                    itemCount: _mockPosts.length + firestorePosts.length,
+                    itemBuilder: (context, i) {
+                      // Mock posts appear at the top
+                      if (i < _mockPosts.length) {
+                        return _MockPostCard(
+                          data: _mockPosts[i],
+                          isDark: isDark,
+                        );
+                      }
+                      // Real Firestore posts below
+                      final post = firestorePosts[i - _mockPosts.length];
+                      return _PostCard(
+                        post: post,
+                        currentUserId: currentUser?.uid ?? '',
+                        postService: _postService,
+                        isDark: isDark,
+                      );
+                    },
                   ),
                 );
               },
@@ -113,7 +164,7 @@ class _FeedPageState extends State<FeedPage> {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader(BuildContext context, bool isDark) {
     final topPad = MediaQuery.of(context).padding.top;
     return Container(
       decoration: BoxDecoration(
@@ -122,8 +173,8 @@ class _FeedPageState extends State<FeedPage> {
           end: Alignment.bottomCenter,
           stops: const [0.0, 0.45, 1.0],
           colors: [
-            AppColors.sunglow.withOpacity(0.32),
-            AppColors.sunglow.withOpacity(0.08),
+            AppColors.sunglow.withOpacity(isDark ? 0.18 : 0.32),
+            AppColors.sunglow.withOpacity(isDark ? 0.04 : 0.08),
             Colors.transparent,
           ],
         ),
@@ -136,13 +187,12 @@ class _FeedPageState extends State<FeedPage> {
       ),
       child: Row(
         children: [
-          // Hamburger — opens side drawer
           _HeaderIconBtn(
             icon: Icons.menu_rounded,
+            isDark: isDark,
             onTap: () => PageWithDrawerCallback.of(context)?.onOpenDrawer(),
           ),
           const SizedBox(width: 10),
-          // Search pill (shows translated placeholder)
           Expanded(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(22),
@@ -151,17 +201,22 @@ class _FeedPageState extends State<FeedPage> {
                 child: Container(
                   height: 42,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.55),
+                    color: isDark
+                        ? Colors.white.withOpacity(0.08)
+                        : Colors.white.withOpacity(0.55),
                     borderRadius: BorderRadius.circular(22),
                     border: Border.all(
-                      color: Colors.white.withOpacity(0.7),
+                      color: isDark
+                          ? Colors.white.withOpacity(0.12)
+                          : Colors.white.withOpacity(0.7),
                       width: 1,
                     ),
                   ),
                   child: Row(
                     children: [
                       const SizedBox(width: 14),
-                      const Icon(Icons.search_rounded, color: AppColors.mutedText, size: 18),
+                      const Icon(Icons.search_rounded,
+                          color: AppColors.mutedText, size: 18),
                       const SizedBox(width: 8),
                       Text(
                         Provider.of<LanguageProvider>(context).t('search'),
@@ -178,16 +233,15 @@ class _FeedPageState extends State<FeedPage> {
             ),
           ),
           const SizedBox(width: 10),
-          // Jobs (briefcase)
           _HeaderIconBtn(
             icon: Icons.work_outline_rounded,
+            isDark: isDark,
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const JobPage()),
             ),
           ),
           const SizedBox(width: 10),
-          // Avatar
           GestureDetector(
             onTap: () {
               if (_userProfile != null) {
@@ -210,53 +264,25 @@ class _FeedPageState extends State<FeedPage> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildLoadingState() {
     return Center(
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(28),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-              child: Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  color: AppColors.wisteria.withOpacity(0.18),
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(0.4),
-                    width: 1,
-                  ),
-                ),
-                child: const Icon(
-                  Icons.article_rounded,
-                  size: 56,
-                  color: AppColors.wisteria,
-                ),
-              ),
+          SizedBox(
+            width: 40,
+            height: 40,
+            child: CircularProgressIndicator(
+              color: AppColors.wisteria,
+              strokeWidth: 2.5,
             ),
           ),
-          const SizedBox(height: 28),
-          // Translated empty state text
-          Text(
-            Provider.of<LanguageProvider>(context).t('noPosts'),
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              color: AppColors.darkPurple,
-              letterSpacing: -0.3,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            Provider.of<LanguageProvider>(context).t('firstPost'),
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 14,
+          const SizedBox(height: 16),
+          const Text(
+            'Loading feed…',
+            style: TextStyle(
               color: AppColors.mutedText,
-              height: 1.6,
+              fontSize: 14,
             ),
           ),
         ],
@@ -265,13 +291,18 @@ class _FeedPageState extends State<FeedPage> {
   }
 }
 
-// ─── Header Icon Button ───────────────────────────────────────────────────────
+// ─── Header Icon Button ────────────────────────────────────────────────────────
 
 class _HeaderIconBtn extends StatelessWidget {
   final IconData icon;
+  final bool isDark;
   final VoidCallback onTap;
 
-  const _HeaderIconBtn({required this.icon, required this.onTap});
+  const _HeaderIconBtn({
+    required this.icon,
+    required this.isDark,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -285,14 +316,22 @@ class _HeaderIconBtn extends StatelessWidget {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.55),
+              color: isDark
+                  ? Colors.white.withOpacity(0.08)
+                  : Colors.white.withOpacity(0.55),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: Colors.white.withOpacity(0.7),
+                color: isDark
+                    ? Colors.white.withOpacity(0.12)
+                    : Colors.white.withOpacity(0.7),
                 width: 1,
               ),
             ),
-            child: Icon(icon, color: AppColors.darkPurple, size: 22),
+            child: Icon(
+              icon,
+              color: isDark ? Colors.white : AppColors.darkPurple,
+              size: 22,
+            ),
           ),
         ),
       ),
@@ -300,17 +339,206 @@ class _HeaderIconBtn extends StatelessWidget {
   }
 }
 
-// ─── Post Card ────────────────────────────────────────────────────────────────
+// ─── Mock Post Card ────────────────────────────────────────────────────────────
+
+class _MockPostCard extends StatefulWidget {
+  final _MockPost data;
+  final bool isDark;
+
+  const _MockPostCard({required this.data, required this.isDark});
+
+  @override
+  State<_MockPostCard> createState() => _MockPostCardState();
+}
+
+class _MockPostCardState extends State<_MockPostCard> {
+  bool _liked = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final d = widget.data;
+    final isDark = widget.isDark;
+    final cardColor = isDark
+        ? Colors.white.withOpacity(0.06)
+        : Colors.white.withOpacity(0.75);
+    final borderColor = isDark
+        ? Colors.white.withOpacity(0.1)
+        : AppColors.wisteria.withOpacity(0.2);
+    final textColor = isDark ? Colors.white : AppColors.darkPurple;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: Container(
+            decoration: BoxDecoration(
+              color: cardColor,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: borderColor, width: 1),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.wisteria.withOpacity(isDark ? 0.04 : 0.08),
+                  blurRadius: 20,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 8, 0),
+                  child: Row(
+                    children: [
+                      _AvatarCircle(
+                          name: d.author, size: 46, fontSize: 18),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              d.author,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: textColor,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              d.role,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.mutedText,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 1),
+                            Text(
+                              d.timeAgo,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: AppColors.mutedText,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.more_horiz_rounded,
+                          color: AppColors.mutedText, size: 20),
+                      const SizedBox(width: 8),
+                    ],
+                  ),
+                ),
+                // Content
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                  child: Text(
+                    d.content,
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: textColor,
+                      height: 1.6,
+                    ),
+                  ),
+                ),
+                // Optional image
+                if (d.imageUrl != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: ClipRRect(
+                      child: Image.network(
+                        d.imageUrl!,
+                        width: double.infinity,
+                        height: 220,
+                        fit: BoxFit.cover,
+                        loadingBuilder: (_, child, progress) =>
+                            progress == null
+                                ? child
+                                : Container(
+                                    height: 220,
+                                    color:
+                                        AppColors.wisteria.withOpacity(0.1),
+                                    child: const Center(
+                                      child: CircularProgressIndicator(
+                                          color: AppColors.wisteria,
+                                          strokeWidth: 2),
+                                    ),
+                                  ),
+                        errorBuilder: (_, __, ___) => Container(
+                          height: 160,
+                          color: AppColors.wisteria.withOpacity(0.08),
+                          child: const Center(
+                            child: Icon(Icons.image_outlined,
+                                color: AppColors.wisteria, size: 40),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 14),
+                // Separator
+                Container(
+                  height: 1,
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  color: AppColors.mutedText.withOpacity(0.12),
+                ),
+                // Actions
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  child: Row(
+                    children: [
+                      _ActionBtn(
+                        icon: _liked
+                            ? Icons.favorite_rounded
+                            : Icons.favorite_border_rounded,
+                        label: '${d.likes + (_liked ? 1 : 0)}',
+                        color: _liked ? Colors.redAccent : AppColors.mutedText,
+                        onTap: () => setState(() => _liked = !_liked),
+                      ),
+                      _ActionBtn(
+                        icon: Icons.chat_bubble_outline_rounded,
+                        label: '${d.comments}',
+                        color: AppColors.mutedText,
+                        onTap: () {},
+                      ),
+                      _ActionBtn(
+                        icon: Icons.share_outlined,
+                        label: 'Share',
+                        color: AppColors.mutedText,
+                        onTap: () {},
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Firestore Post Card ───────────────────────────────────────────────────────
 
 class _PostCard extends StatefulWidget {
   final Post post;
   final String currentUserId;
   final PostService postService;
+  final bool isDark;
 
   const _PostCard({
     required this.post,
     required this.currentUserId,
     required this.postService,
+    required this.isDark,
   });
 
   @override
@@ -330,7 +558,6 @@ class _PostCardState extends State<_PostCard> {
     if (mounted) setState(() => _likeLoading = false);
   }
 
-  // Opens comments as a draggable bottom sheet instead of a dialog
   void _showComments() {
     showModalBottomSheet(
       context: context,
@@ -341,6 +568,7 @@ class _PostCardState extends State<_PostCard> {
   }
 
   void _showMenu() {
+    final isDark = widget.isDark;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -353,9 +581,16 @@ class _PostCardState extends State<_PostCard> {
           filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.92),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-              border: Border.all(color: Colors.white.withOpacity(0.5), width: 1),
+              color: isDark
+                  ? AppColors.darkCard.withOpacity(0.95)
+                  : Colors.white.withOpacity(0.92),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(24)),
+              border: Border.all(
+                  color: isDark
+                      ? Colors.white.withOpacity(0.1)
+                      : Colors.white.withOpacity(0.5),
+                  width: 1),
             ),
             child: SafeArea(
               child: Column(
@@ -378,11 +613,13 @@ class _PostCardState extends State<_PostCard> {
                         color: Colors.red.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 20),
+                      child: const Icon(Icons.delete_outline_rounded,
+                          color: Colors.red, size: 20),
                     ),
                     title: const Text(
                       'Delete post',
-                      style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                          color: Colors.red, fontWeight: FontWeight.w600),
                     ),
                     onTap: () async {
                       Navigator.pop(context);
@@ -402,6 +639,15 @@ class _PostCardState extends State<_PostCard> {
   @override
   Widget build(BuildContext context) {
     final post = widget.post;
+    final isDark = widget.isDark;
+    final cardColor = isDark
+        ? Colors.white.withOpacity(0.06)
+        : Colors.white.withOpacity(0.75);
+    final borderColor = isDark
+        ? Colors.white.withOpacity(0.1)
+        : Colors.white.withOpacity(0.6);
+    final textColor = isDark ? Colors.white : AppColors.darkPurple;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       child: ClipRRect(
@@ -410,15 +656,12 @@ class _PostCardState extends State<_PostCard> {
           filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.75),
+              color: cardColor,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.6),
-                width: 1,
-              ),
+              border: Border.all(color: borderColor, width: 1),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.wisteria.withOpacity(0.08),
+                  color: AppColors.wisteria.withOpacity(isDark ? 0.04 : 0.08),
                   blurRadius: 20,
                   offset: const Offset(0, 6),
                 ),
@@ -432,7 +675,8 @@ class _PostCardState extends State<_PostCard> {
                   padding: const EdgeInsets.fromLTRB(16, 16, 8, 0),
                   child: Row(
                     children: [
-                      _AvatarCircle(name: post.author, size: 46, fontSize: 18),
+                      _AvatarCircle(
+                          name: post.author, size: 46, fontSize: 18),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
@@ -440,10 +684,10 @@ class _PostCardState extends State<_PostCard> {
                           children: [
                             Text(
                               post.author,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w700,
-                                color: AppColors.darkPurple,
+                                color: textColor,
                               ),
                             ),
                             const SizedBox(height: 2),
@@ -473,14 +717,14 @@ class _PostCardState extends State<_PostCard> {
                   padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
                   child: Text(
                     post.content,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
-                      color: AppColors.darkPurple,
+                      color: textColor,
                       height: 1.6,
                     ),
                   ),
                 ),
-                // Soft separator
+                // Separator
                 Container(
                   height: 1,
                   margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -488,7 +732,8 @@ class _PostCardState extends State<_PostCard> {
                 ),
                 // Actions
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
                   child: Row(
                     children: [
                       _ActionBtn(
@@ -496,7 +741,8 @@ class _PostCardState extends State<_PostCard> {
                             ? Icons.favorite_rounded
                             : Icons.favorite_border_rounded,
                         label: post.likedBy.length.toString(),
-                        color: _isLiked ? Colors.redAccent : AppColors.mutedText,
+                        color:
+                            _isLiked ? Colors.redAccent : AppColors.mutedText,
                         onTap: _toggleLike,
                         loading: _likeLoading,
                       ),

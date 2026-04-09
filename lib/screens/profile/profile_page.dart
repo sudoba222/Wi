@@ -34,8 +34,9 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: isDark ? AppColors.darkBg : AppColors.white,
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
