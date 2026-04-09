@@ -97,12 +97,14 @@ class _LoginPageState extends State<LoginPage> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.white,
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return AlertDialog(
+        backgroundColor: isDark ? AppColors.darkCard : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
+        title: Text(
           'Reset Password',
-          style: TextStyle(color: AppColors.darkPurple),
+          style: TextStyle(color: isDark ? Colors.white : AppColors.darkPurple),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -159,7 +161,8 @@ class _LoginPageState extends State<LoginPage> {
             child: const Text('Send Reset Link', style: TextStyle(color: AppColors.darkPurple)),
           ),
         ],
-      ),
+      );
+      },
     );
   }
 
@@ -374,6 +377,8 @@ class _LoginPageState extends State<LoginPage> {
                             'https://www.google.com/favicon.ico',
                             height: 24,
                             width: 24,
+                            errorBuilder: (_, __, ___) =>
+                                const Icon(Icons.g_mobiledata_rounded, size: 24, color: AppColors.darkPurple),
                           ),
                           label: const Text(
                             'Continue with Google',

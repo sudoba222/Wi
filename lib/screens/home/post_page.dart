@@ -107,17 +107,22 @@ class _PostPageState extends State<PostPage> {
                         children: [
                           _AuthorRow(isDark: isDark),
                           const SizedBox(height: 16),
-                          TextField(
-                            controller: _contentController,
-                            maxLines: 4,
-                            style: TextStyle(
-                              fontSize: 16, height: 1.5,
-                              color: isDark ? Colors.white : AppColors.darkPurple,
-                            ),
-                            decoration: const InputDecoration(
-                              hintText: "What's on your mind?",
-                              hintStyle: TextStyle(fontSize: 16, color: AppColors.mutedText),
-                              border: InputBorder.none,
+                          // Material(transparency) fixes "No Material ancestor" error
+                          // that occurs when TextField is inside BackdropFilter/ClipRRect.
+                          Material(
+                            type: MaterialType.transparency,
+                            child: TextField(
+                              controller: _contentController,
+                              maxLines: 4,
+                              style: TextStyle(
+                                fontSize: 16, height: 1.5,
+                                color: isDark ? Colors.white : AppColors.darkPurple,
+                              ),
+                              decoration: const InputDecoration(
+                                hintText: "What's on your mind?",
+                                hintStyle: TextStyle(fontSize: 16, color: AppColors.mutedText),
+                                border: InputBorder.none,
+                              ),
                             ),
                           ),
                           const SizedBox(height: 12),

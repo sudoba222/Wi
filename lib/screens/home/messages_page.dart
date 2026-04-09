@@ -276,17 +276,21 @@ class _SearchBarWithNewChat extends StatelessWidget {
           ),
           child: Row(
             children: [
-              // Search field
+              // Material(transparency) fixes "No Material ancestor" error
+              // when TextField is inside BackdropFilter/ClipRRect.
               Expanded(
-                child: TextField(
-                  onChanged: onChanged,
-                  style: TextStyle(fontSize: 15, color: isDark ? Colors.white : AppColors.darkPurple),
-                  decoration: InputDecoration(
-                    hintText: 'Search conversations…',
-                    hintStyle: const TextStyle(fontSize: 15, color: AppColors.mutedText),
-                    prefixIcon: const Icon(Icons.search_rounded, color: AppColors.mutedText, size: 20),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: TextField(
+                    onChanged: onChanged,
+                    style: TextStyle(fontSize: 15, color: isDark ? Colors.white : AppColors.darkPurple),
+                    decoration: InputDecoration(
+                      hintText: 'Search conversations…',
+                      hintStyle: const TextStyle(fontSize: 15, color: AppColors.mutedText),
+                      prefixIcon: const Icon(Icons.search_rounded, color: AppColors.mutedText, size: 20),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
+                    ),
                   ),
                 ),
               ),
@@ -533,12 +537,13 @@ class _UserSearchSheetState extends State<_UserSearchSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       height: MediaQuery.of(context).size.height * 0.75,
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-      decoration: const BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkDrawer : AppColors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       ),
       child: Column(
         children: [
@@ -549,30 +554,35 @@ class _UserSearchSheetState extends State<_UserSearchSheet> {
               decoration: BoxDecoration(color: AppColors.mutedText.withOpacity(0.3), borderRadius: BorderRadius.circular(2)),
             ),
           ),
-          // Header
-          const Align(
+          // Header — theme-aware text color
+          Align(
             alignment: Alignment.centerLeft,
-            child: Text('New Conversation', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.darkPurple)),
+            child: Text('New Conversation',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800,
+                  color: isDark ? Colors.white : AppColors.darkPurple)),
           ),
           const SizedBox(height: 14),
           // Search input — queries Firestore on change
           Container(
             decoration: BoxDecoration(
-              color: AppColors.background,
+              color: isDark ? Colors.white.withOpacity(0.08) : AppColors.background,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: AppColors.wisteria.withOpacity(0.3)),
             ),
-            child: TextField(
-              controller: _ctrl,
-              autofocus: true,
-              style: const TextStyle(color: AppColors.darkPurple),
-              onChanged: _search,
-              decoration: const InputDecoration(
-                hintText: 'Search by name or email…',
-                hintStyle: TextStyle(color: AppColors.mutedText),
-                prefixIcon: Icon(Icons.search_rounded, color: AppColors.wisteria, size: 20),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            child: Material(
+              type: MaterialType.transparency,
+              child: TextField(
+                controller: _ctrl,
+                autofocus: true,
+                style: TextStyle(color: isDark ? Colors.white : AppColors.darkPurple),
+                onChanged: _search,
+                decoration: const InputDecoration(
+                  hintText: 'Search by name or email…',
+                  hintStyle: TextStyle(color: AppColors.mutedText),
+                  prefixIcon: Icon(Icons.search_rounded, color: AppColors.wisteria, size: 20),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                ),
               ),
             ),
           ),

@@ -402,16 +402,17 @@ class _ChatScreenState extends State<ChatScreen> {
 
   /// Glass input bar at the bottom with attach, text field, and send button.
   Widget _buildInputBar() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return ClipRect(
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.72),
+            color: isDark ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.72),
             border: Border(
               top: BorderSide(
-                color: Colors.white.withOpacity(0.4),
+                color: isDark ? Colors.white.withOpacity(0.12) : Colors.white.withOpacity(0.4),
                 width: 1,
               ),
             ),
@@ -429,31 +430,35 @@ class _ChatScreenState extends State<ChatScreen> {
                     size: 22,
                   ),
                 ),
-                // Expandable text input field.
+                // Expandable text input — Material(transparency) fixes
+                // "No Material ancestor" error inside BackdropFilter.
                 Expanded(
                   child: Container(
                     constraints: const BoxConstraints(maxHeight: 120),
                     decoration: BoxDecoration(
-                      color: AppColors.background,
+                      color: isDark ? Colors.white.withOpacity(0.08) : AppColors.background,
                       borderRadius: BorderRadius.circular(24),
                     ),
-                    child: TextField(
-                      controller: _controller,
-                      maxLines: null,
-                      style: const TextStyle(
-                        color: AppColors.darkPurple,
-                        fontSize: 15,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: 'Message…',
-                        hintStyle: TextStyle(
-                          color: AppColors.mutedText.withOpacity(0.8),
+                    child: Material(
+                      type: MaterialType.transparency,
+                      child: TextField(
+                        controller: _controller,
+                        maxLines: null,
+                        style: TextStyle(
+                          color: isDark ? Colors.white : AppColors.darkPurple,
                           fontSize: 15,
                         ),
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
+                        decoration: InputDecoration(
+                          hintText: 'Message…',
+                          hintStyle: TextStyle(
+                            color: AppColors.mutedText.withOpacity(0.8),
+                            fontSize: 15,
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
                         ),
                       ),
                     ),
