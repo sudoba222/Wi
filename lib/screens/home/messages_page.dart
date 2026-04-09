@@ -2,6 +2,7 @@
 
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../utils/app_colors.dart';
 import '../../services/global_data.dart';
 import '../chat/chat_screen.dart';
@@ -21,32 +22,19 @@ class _MessagesPageState extends State<MessagesPage> {
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
-  /// Opens a bottom sheet where the user can type a name to start a new chat.
+  /// Opens a search-by-username/email bottom sheet to start a new chat.
   void _showNewChatSheet() {
-    final nameController = TextEditingController();
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return Padding(
-          // Keep the input above the keyboard.
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(ctx).viewInsets.bottom,
-          ),
-          child: _GlassBottomSheet(
-            nameController: nameController,
-            onStart: () {
-              final name = nameController.text.trim();
-              if (name.isEmpty) return;
-              GlobalData.createConversation(name);
-              setState(() {});
-              Navigator.pop(ctx);
-            },
-          ),
-        );
-      },
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        child: _UserSearchSheet(onStart: (name) {
+          GlobalData.createConversation(name);
+          setState(() {});
+        }),
+      ),
     );
   }
 
@@ -364,112 +352,150 @@ class _ConversationTile extends StatelessWidget {
 }
 
 /// Bottom sheet content for starting a new conversation.
-class _GlassBottomSheet extends StatelessWidget {
-  final TextEditingController nameController;
-  final VoidCallback onStart;
+/// Search-by-username/email bottom sheet.
+/// Queries Firestore `users` collection in real time as the user types.
+class _UserSearchSheet extends StatefulWidget {
+  final void Function(String name) onStart;
+  const _UserSearchSheet({required this.onStart});
 
-  const _GlassBottomSheet({
-    required this.nameController,
-    required this.onStart,
-  });
+  @override
+  State<_UserSearchSheet> createState() => _UserSearchSheetState();
+}
+
+class _UserSearchSheetState extends State<_UserSearchSheet> {
+  final _ctrl = TextEditingController();
+  List<Map<String, dynamic>> _results = [];
+  bool _loading = false;
+
+  // Search Firestore users by fullName or email prefix
+  Future<void> _search(String query) async {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) { setState(() { _results = []; _loading = false; }); return; }
+    setState(() => _loading = true);
+
+    try {
+      // Query by fullName
+      final byName = await FirebaseFirestore.instance
+          .collection('users')
+          .where('fullName', isGreaterThanOrEqualTo: query)
+          .where('fullName', isLessThanOrEqualTo: '$query\uf8ff')
+          .limit(10).get();
+
+      // Query by email
+      final byEmail = await FirebaseFirestore.instance
+          .collection('users')
+          .where('email', isGreaterThanOrEqualTo: q)
+          .where('email', isLessThanOrEqualTo: '$q\uf8ff')
+          .limit(10).get();
+
+      // Merge and deduplicate results
+      final seen = <String>{};
+      final merged = <Map<String, dynamic>>[];
+      for (final doc in [...byName.docs, ...byEmail.docs]) {
+        if (seen.add(doc.id)) {
+          merged.add({...doc.data(), 'uid': doc.id});
+        }
+      }
+      if (mounted) setState(() { _results = merged; _loading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-          decoration: BoxDecoration(
-            color: AppColors.background.withOpacity(0.92),
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(28)),
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.75,
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+      decoration: const BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: Column(
+        children: [
+          // Drag handle
+          Center(
+            child: Container(
+              width: 40, height: 4, margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(color: AppColors.mutedText.withOpacity(0.3), borderRadius: BorderRadius.circular(2)),
+            ),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Drag handle indicator.
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.mutedText.withOpacity(0.35),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                'New conversation',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.darkPurple,
-                ),
-              ),
-              const SizedBox(height: 16),
-              // Name text field.
-              TextField(
-                controller: nameController,
-                autofocus: true,
-                style: const TextStyle(color: AppColors.darkPurple),
-                decoration: InputDecoration(
-                  hintText: 'Enter a name',
-                  hintStyle:
-                      const TextStyle(color: AppColors.mutedText),
-                  filled: true,
-                  fillColor: Colors.white.withOpacity(0.6),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide(
-                      color: AppColors.wisteria.withOpacity(0.4),
-                    ),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide(
-                      color: AppColors.wisteria.withOpacity(0.4),
-                    ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(
-                      color: AppColors.splashPurple,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              // Start Chat amber button.
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: onStart,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.sunglow,
-                    foregroundColor: AppColors.darkPurple,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  child: const Text(
-                    'Start Chat',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+          // Header
+          const Align(
+            alignment: Alignment.centerLeft,
+            child: Text('New Conversation', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.darkPurple)),
           ),
-        ),
+          const SizedBox(height: 14),
+          // Search input — queries Firestore on change
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.wisteria.withOpacity(0.3)),
+            ),
+            child: TextField(
+              controller: _ctrl,
+              autofocus: true,
+              style: const TextStyle(color: AppColors.darkPurple),
+              onChanged: _search,
+              decoration: const InputDecoration(
+                hintText: 'Search by name or email…',
+                hintStyle: TextStyle(color: AppColors.mutedText),
+                prefixIcon: Icon(Icons.search_rounded, color: AppColors.wisteria, size: 20),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Results list
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator(color: AppColors.wisteria, strokeWidth: 2))
+                : _results.isEmpty
+                    ? Center(
+                        child: Text(
+                          _ctrl.text.isEmpty ? 'Type a name or email to search' : 'No users found',
+                          style: const TextStyle(color: AppColors.mutedText, fontSize: 14),
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: _results.length,
+                        itemBuilder: (_, i) {
+                          final u = _results[i];
+                          final name = u['fullName'] ?? u['email'] ?? 'Unknown';
+                          final email = u['email'] ?? '';
+                          final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+                          return ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+                            leading: Container(
+                              width: 44, height: 44,
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: LinearGradient(colors: [AppColors.wisteria, AppColors.splashPurple]),
+                              ),
+                              child: Center(child: Text(initial, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16))),
+                            ),
+                            title: Text(name, style: const TextStyle(color: AppColors.darkPurple, fontWeight: FontWeight.w600, fontSize: 15)),
+                            subtitle: Text(email, style: const TextStyle(color: AppColors.mutedText, fontSize: 12)),
+                            trailing: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                              decoration: BoxDecoration(color: AppColors.sunglow, borderRadius: BorderRadius.circular(20)),
+                              child: const Text('Chat', style: TextStyle(color: AppColors.darkPurple, fontWeight: FontWeight.w700, fontSize: 13)),
+                            ),
+                            onTap: () {
+                              Navigator.pop(context);
+                              widget.onStart(name);
+                            },
+                          );
+                        },
+                      ),
+          ),
+        ],
       ),
     );
   }
+
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
 }

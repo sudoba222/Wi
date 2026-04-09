@@ -330,9 +330,12 @@ class _PostCardState extends State<_PostCard> {
     if (mounted) setState(() => _likeLoading = false);
   }
 
+  // Opens comments as a draggable bottom sheet instead of a dialog
   void _showComments() {
-    showDialog(
+    showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (_) => CommentsDialog(post: widget.post),
     );
   }

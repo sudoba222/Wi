@@ -41,6 +41,7 @@ class _PostPageState extends State<PostPage> {
 
     final newPost = Post(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
+      authorId: '',
       author: 'You',
       content: text,
       timestamp: DateTime.now(),

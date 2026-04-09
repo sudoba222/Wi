@@ -84,6 +84,145 @@ class _ChatScreenState extends State<ChatScreen> {
         .addPostFrameCallback((_) => _scrollToBottom());
   }
 
+  /// Opens a bottom sheet to schedule a meeting with the contact.
+  void _showMeetingScheduler(BuildContext context) {
+    DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
+    TimeOfDay _selectedTime = const TimeOfDay(hour: 10, minute: 0);
+    final _titleCtrl = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+            decoration: const BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Drag handle
+                Center(
+                  child: Container(
+                    width: 40, height: 4, margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(color: AppColors.mutedText.withOpacity(0.3), borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+                // Title
+                Row(
+                  children: [
+                    Container(
+                      width: 36, height: 36,
+                      decoration: BoxDecoration(color: AppColors.wisteria.withOpacity(0.15), borderRadius: BorderRadius.circular(10)),
+                      child: const Icon(Icons.calendar_month_rounded, color: AppColors.wisteria, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text('Schedule Meeting', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.darkPurple)),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                // Meeting title input
+                Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.background,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.wisteria.withOpacity(0.2)),
+                  ),
+                  child: TextField(
+                    controller: _titleCtrl,
+                    decoration: const InputDecoration(
+                      hintText: 'Meeting title…',
+                      hintStyle: TextStyle(color: AppColors.mutedText),
+                      prefixIcon: Icon(Icons.title_rounded, color: AppColors.wisteria, size: 20),
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                    ),
+                    style: const TextStyle(color: AppColors.darkPurple),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Date picker row
+                GestureDetector(
+                  onTap: () async {
+                    final d = await showDatePicker(
+                      context: ctx,
+                      initialDate: _selectedDate,
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                      builder: (c, child) => Theme(
+                        data: ThemeData.light().copyWith(
+                          colorScheme: const ColorScheme.light(primary: AppColors.splashPurple, onPrimary: Colors.white),
+                        ),
+                        child: child!,
+                      ),
+                    );
+                    if (d != null) setS(() => _selectedDate = d);
+                  },
+                  child: _MeetingRow(
+                    icon: Icons.calendar_today_rounded,
+                    label: 'Date',
+                    value: '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // Time picker row
+                GestureDetector(
+                  onTap: () async {
+                    final t = await showTimePicker(context: ctx, initialTime: _selectedTime,
+                      builder: (c, child) => Theme(
+                        data: ThemeData.light().copyWith(
+                          colorScheme: const ColorScheme.light(primary: AppColors.splashPurple, onPrimary: Colors.white),
+                        ),
+                        child: child!,
+                      ),
+                    );
+                    if (t != null) setS(() => _selectedTime = t);
+                  },
+                  child: _MeetingRow(
+                    icon: Icons.access_time_rounded,
+                    label: 'Time',
+                    value: _selectedTime.format(ctx),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // Confirm button
+                SizedBox(
+                  width: double.infinity, height: 52,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      final title = _titleCtrl.text.trim().isEmpty ? 'Meeting' : _titleCtrl.text.trim();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Meeting "$title" scheduled for ${_selectedDate.day}/${_selectedDate.month} at ${_selectedTime.format(context)}'),
+                          backgroundColor: AppColors.splashPurple,
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.sunglow,
+                      foregroundColor: AppColors.darkPurple,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    child: const Text('Schedule Meeting', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   // ── Build ──────────────────────────────────────────────────────────────────
 
   @override
@@ -205,21 +344,15 @@ class _ChatScreenState extends State<ChatScreen> {
                   ],
                 ),
               ),
-              // Action icons — video call, voice call, more.
+              // Schedule a meeting button (replaces video/call)
               IconButton(
-                onPressed: () {},
-                icon: const Icon(Icons.videocam_outlined,
-                    color: AppColors.darkPurple),
+                onPressed: () => _showMeetingScheduler(context),
+                tooltip: 'Schedule meeting',
+                icon: const Icon(Icons.calendar_month_rounded, color: AppColors.wisteria),
               ),
               IconButton(
                 onPressed: () {},
-                icon: const Icon(Icons.call_outlined,
-                    color: AppColors.darkPurple),
-              ),
-              IconButton(
-                onPressed: () {},
-                icon: const Icon(Icons.more_vert_rounded,
-                    color: AppColors.darkPurple),
+                icon: const Icon(Icons.more_vert_rounded, color: AppColors.darkPurple),
               ),
             ],
           ),
@@ -470,6 +603,39 @@ class _MessageBubble extends StatelessWidget {
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Meeting row tile inside the scheduler sheet ───────────────────────────
+
+/// A tappable info row showing a label + value (used for date and time pickers).
+class _MeetingRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  const _MeetingRow({required this.icon, required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.wisteria.withOpacity(0.2)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: AppColors.wisteria, size: 20),
+          const SizedBox(width: 12),
+          Text(label, style: const TextStyle(color: AppColors.mutedText, fontSize: 14)),
+          const Spacer(),
+          Text(value, style: const TextStyle(color: AppColors.darkPurple, fontWeight: FontWeight.w600, fontSize: 14)),
+          const SizedBox(width: 4),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.mutedText, size: 18),
         ],
       ),
     );
