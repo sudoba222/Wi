@@ -1,9 +1,21 @@
-import 'package:flutter/material.dart';
-import '../../utils/app_colors.dart';
-import '../../services/global_data.dart';
-import '../../models/post.dart';
-import '../../widgets/glassmorphic_container.dart';
+// ignore_for_file: deprecated_member_use
 
+import 'dart:ui';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../utils/app_colors.dart';
+// BUG FIX (2026-04-10): PostPage was writing to GlobalData (in-memory) while
+// FeedPage reads from Firestore via PostService — posts never appeared in feed.
+// Fix: replaced GlobalData.addPost() with PostService.createPost() so posts
+// are saved to Firestore and immediately visible in the real-time feed stream.
+import '../../services/post_services.dart';
+import '../../services/auth_services.dart';
+
+/// Redesigned "Create Post" page.
+/// - Clean full-height text area
+/// - Publish button (amber when text present, greyed when empty)
+/// - Author row with globe + Public audience pill
+/// - Pinned bottom toolbar: media icons + character counter
 class PostPage extends StatefulWidget {
   const PostPage({super.key});
 
@@ -15,140 +27,187 @@ class _PostPageState extends State<PostPage> {
   final _contentController = TextEditingController();
   bool _isPosting = false;
 
+  static const int _maxChars = 2000;
+
+  int get _charCount => _contentController.text.length;
+  bool get _hasText => _contentController.text.trim().isNotEmpty;
+
+  @override
+  void initState() {
+    super.initState();
+    _contentController.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _contentController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _publish() async {
+    final text = _contentController.text.trim();
+    if (text.isEmpty || _isPosting) return;
+    setState(() => _isPosting = true);
+
+    // Save post to Firestore — PostService handles authorId + author name
+    // from the currently signed-in Firebase user automatically.
+    final success = await PostService().createPost(content: text);
+
+    if (!mounted) return;
+    setState(() => _isPosting = false);
+
+    if (success) {
+      Navigator.pop(context);
+    } else {
+      // Show error snackbar if Firestore write failed
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to publish. Please try again.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final topPad = MediaQuery.of(context).padding.top;
+    final bottomPad = MediaQuery.of(context).padding.bottom;
+
+    final bgColor = isDark ? AppColors.darkBg : AppColors.background;
+    final textColor = isDark ? Colors.white : AppColors.darkPurple;
+
+    return Scaffold(
+      backgroundColor: bgColor,
+      body: Column(
         children: [
-          const Text(
-            'Create Post',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: AppColors.darkPurple,
+          // ── Top bar ─────────────────────────────────────────────────────────
+          _buildTopBar(context, topPad, isDark, textColor),
+
+          // ── Author row ───────────────────────────────────────────────────────
+          _buildAuthorRow(isDark, textColor),
+
+          // ── Scrollable text area (flex expands) ──────────────────────────────
+          Expanded(
+            child: Material(
+              type: MaterialType.transparency,
+              child: TextField(
+                controller: _contentController,
+                maxLines: null,
+                expands: true,
+                maxLength: _maxChars,
+                buildCounter: (_, {required currentLength, required isFocused, maxLength}) =>
+                    const SizedBox.shrink(), // hide default counter — we show our own
+                textAlignVertical: TextAlignVertical.top,
+                style: TextStyle(
+                  fontSize: 17,
+                  height: 1.65,
+                  color: textColor,
+                ),
+                decoration: InputDecoration(
+                  hintText: "What's on your mind?",
+                  hintStyle: TextStyle(
+                    fontSize: 17,
+                    color: AppColors.mutedText.withOpacity(0.8),
+                    height: 1.65,
+                  ),
+                  border: InputBorder.none,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                ),
+              ),
             ),
           ),
-          const SizedBox(height: 20),
+
+          // ── Bottom toolbar — pinned ──────────────────────────────────────────
+          _buildBottomToolbar(isDark, bottomPad),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTopBar(
+    BuildContext context,
+    double topPad,
+    bool isDark,
+    Color textColor,
+  ) {
+    return Container(
+      padding: EdgeInsets.only(
+        top: topPad + 8,
+        left: 4,
+        right: 12,
+        bottom: 8,
+      ),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkBg : AppColors.background,
+        border: Border(
+          bottom: BorderSide(
+            color: isDark
+                ? Colors.white.withOpacity(0.08)
+                : AppColors.wisteria.withOpacity(0.15),
+            width: 1,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          // Back arrow
+          IconButton(
+            icon: Icon(
+              Icons.arrow_back_ios_rounded,
+              color: textColor,
+              size: 20,
+            ),
+            onPressed: () => Navigator.pop(context),
+          ),
+          // Title
           Expanded(
-            child: GlassmorphicContainer(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // User Info
-                    Row(
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: const BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: AppColors.wisteria,
-                          ),
-                          child: const Center(
-                            child: Text(
-                              'Y',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        const Text(
-                          'You',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.darkPurple,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    // Content Input
-                    Expanded(
-                      child: TextField(
-                        controller: _contentController,
-                        maxLines: null,
-                        expands: true,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          color: AppColors.darkPurple,
-                        ),
-                        decoration: const InputDecoration(
-                          hintText: 'What\'s on your mind?',
-                          hintStyle: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey,
-                          ),
-                          border: InputBorder.none,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    // Post Options
-                    Row(
-                      children: [
-                        _buildPostOption(
-                          icon: Icons.image_outlined,
-                          label: 'Photo',
-                          onTap: () {},
-                        ),
-                        const SizedBox(width: 20),
-                        _buildPostOption(
-                          icon: Icons.videocam_outlined,
-                          label: 'Video',
-                          onTap: () {},
-                        ),
-                        const SizedBox(width: 20),
-                        _buildPostOption(
-                          icon: Icons.location_on_outlined,
-                          label: 'Location',
-                          onTap: () {},
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    // Post Button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: _isPosting ? null : _createPost,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.sunglow,
-                          foregroundColor: AppColors.darkPurple,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: _isPosting
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: AppColors.darkPurple,
-                                ),
-                              )
-                            : const Text(
-                                'Post',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                      ),
-                    ),
-                  ],
+            child: Text(
+              'Create Post',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+                color: textColor,
+              ),
+            ),
+          ),
+          // Publish button — amber when text entered, grey when empty
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            child: GestureDetector(
+              onTap: _hasText && !_isPosting ? _publish : null,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+                decoration: BoxDecoration(
+                  color: _hasText
+                      ? AppColors.sunglow
+                      : AppColors.mutedText.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(20),
                 ),
+                child: _isPosting
+                    ? SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: isDark ? Colors.white : AppColors.darkPurple,
+                        ),
+                      )
+                    : Text(
+                        'Publish',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: _hasText
+                              ? AppColors.darkPurple
+                              : AppColors.mutedText,
+                        ),
+                      ),
               ),
             ),
           ),
@@ -157,79 +216,175 @@ class _PostPageState extends State<PostPage> {
     );
   }
 
-  Widget _buildPostOption({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: AppColors.wisteria.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 18,
-              color: AppColors.darkPurple.withOpacity(0.7),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                color: AppColors.darkPurple.withOpacity(0.7),
+  Widget _buildAuthorRow(bool isDark, Color textColor) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      child: Row(
+        children: [
+          // Gradient avatar
+          Container(
+            width: 46,
+            height: 46,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [AppColors.wisteria, AppColors.splashPurple],
               ),
             ),
-          ],
-        ),
+            child: const Center(
+              child: Text(
+                'Y',
+                style: TextStyle(
+                  color: AppColors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'You',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: textColor,
+                ),
+              ),
+              const SizedBox(height: 4),
+              // Public pill with globe icon
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.wisteria.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppColors.wisteria.withOpacity(0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.public_rounded,
+                      size: 13,
+                      color: AppColors.splashPurple,
+                    ),
+                    const SizedBox(width: 4),
+                    const Text(
+                      'Public',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.splashPurple,
+                      ),
+                    ),
+                    const SizedBox(width: 3),
+                    Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      size: 14,
+                      color: AppColors.splashPurple,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
-  void _createPost() async {
-    if (_contentController.text.trim().isEmpty) return;
-
-    setState(() {
-      _isPosting = true;
-    });
-
-    // Simulate network delay
-    await Future.delayed(const Duration(seconds: 1));
-
-    final newPost = Post(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      author: 'You',
-      content: _contentController.text.trim(),
-      timestamp: DateTime.now(),
-    );
-
-    GlobalData.addPost(newPost);
-
-    setState(() {
-      _isPosting = false;
-      _contentController.clear();
-    });
-
-    // Show success message
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Post created successfully!'),
-          backgroundColor: AppColors.sunglow,
+  Widget _buildBottomToolbar(bool isDark, double bottomPad) {
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 10,
+            bottom: 10 + bottomPad,
+          ),
+          decoration: BoxDecoration(
+            color: isDark
+                ? Colors.white.withOpacity(0.06)
+                : Colors.white.withOpacity(0.8),
+            border: Border(
+              top: BorderSide(
+                color: isDark
+                    ? Colors.white.withOpacity(0.1)
+                    : AppColors.wisteria.withOpacity(0.2),
+                width: 1,
+              ),
+            ),
+          ),
+          child: Row(
+            children: [
+              // Media icons
+              _ToolbarIcon(
+                  icon: Icons.image_outlined, onTap: () {}),
+              const SizedBox(width: 4),
+              _ToolbarIcon(
+                  icon: Icons.videocam_outlined, onTap: () {}),
+              const SizedBox(width: 4),
+              _ToolbarIcon(
+                  icon: Icons.person_add_outlined, onTap: () {}),
+              const SizedBox(width: 4),
+              _ToolbarIcon(
+                  icon: Icons.location_on_outlined, onTap: () {}),
+              const Spacer(),
+              // Character counter
+              Text(
+                '$_charCount/$_maxChars',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: _charCount > _maxChars * 0.9
+                      ? (_charCount >= _maxChars
+                          ? Colors.red
+                          : Colors.orange)
+                      : AppColors.mutedText,
+                ),
+              ),
+            ],
+          ),
         ),
-      );
-    }
+      ),
+    );
   }
+}
+
+/// Toolbar icon button — wisteria color.
+class _ToolbarIcon extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _ToolbarIcon({required this.icon, required this.onTap});
 
   @override
-  void dispose() {
-    _contentController.dispose();
-    super.dispose();
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(
+          icon,
+          size: 24,
+          color: AppColors.wisteria,
+        ),
+      ),
+    );
   }
 }

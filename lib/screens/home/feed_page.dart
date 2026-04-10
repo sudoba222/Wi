@@ -1,8 +1,82 @@
+// ignore_for_file: deprecated_member_use
+
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../utils/app_colors.dart';
-import '../../services/global_data.dart';
 import '../../models/post.dart';
-import '../../widgets/glassmorphic_container.dart';
+import '../../models/user_profile.dart';
+import '../../services/post_services.dart';
+import '../../services/auth_services.dart';
+import '../../widgets/comments_dialog.dart';
+import '../../providers/language_provider.dart';
+import '../profile/profile_page.dart';
+import 'home_page.dart';
+import 'job_page.dart';
+
+// ─── Mock post data ────────────────────────────────────────────────────────────
+
+class _MockPost {
+  final String author;
+  final String role;
+  final String initial;
+  final String content;
+  final String? imageUrl;
+  final int likes;
+  final int comments;
+  final String timeAgo;
+
+  const _MockPost({
+    required this.author,
+    required this.role,
+    required this.initial,
+    required this.content,
+    this.imageUrl,
+    required this.likes,
+    required this.comments,
+    required this.timeAgo,
+  });
+}
+
+const _mockPosts = [
+  _MockPost(
+    author: 'Alisher N.',
+    role: 'Flutter Developer · Alif.tj',
+    initial: 'A',
+    content:
+        'Just shipped a brand-new feature to production — real-time analytics built entirely in Flutter. Six months of late nights, dozens of code reviews, and one very patient team. Watching real users interact with it in the first hour was worth every minute. This is why we build. 🚀 #Flutter #TajikTech #MobileFirst',
+    imageUrl:
+        'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=600&q=80',
+    likes: 42,
+    comments: 8,
+    timeAgo: '1h ago',
+  ),
+  _MockPost(
+    author: 'Nargis R.',
+    role: 'UX Designer · Freelance',
+    initial: 'N',
+    content:
+        'Design systems are not just component libraries — they are a shared language. Spent the last week documenting every spacing decision, typography scale, and interaction pattern in our product. The result: a team that ships faster and a product that looks like one person designed it. #UX #DesignSystem #ProductDesign',
+    imageUrl: null,
+    likes: 28,
+    comments: 5,
+    timeAgo: '3h ago',
+  ),
+  _MockPost(
+    author: 'Rustam K.',
+    role: 'Product Manager · TechHub TJ',
+    initial: 'R',
+    content:
+        'We are hiring! Looking for a senior Flutter developer to join our growing team in Dushanbe. Competitive salary, remote-friendly, and the chance to build products used by thousands across Tajikistan. DM me or apply via the link below. Referrals welcome! 🙌 #Hiring #Flutter #Dushanbe',
+    imageUrl:
+        'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=600&q=80',
+    likes: 67,
+    comments: 14,
+    timeAgo: '6h ago',
+  ),
+];
+
+// ─── Feed Page ────────────────────────────────────────────────────────────────
 
 class FeedPage extends StatefulWidget {
   const FeedPage({super.key});
@@ -12,179 +86,77 @@ class FeedPage extends StatefulWidget {
 }
 
 class _FeedPageState extends State<FeedPage> {
+  final _postService = PostService();
+  UserProfile? _userProfile;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    final auth = Provider.of<AuthService>(context, listen: false);
+    if (auth.currentUser != null) {
+      final p = await auth.getFullUserProfile(auth.currentUser!.uid);
+      if (mounted) setState(() => _userProfile = p);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (GlobalData.posts.isEmpty) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.feed_outlined,
-              size: 64,
-              color: Colors.grey,
-            ),
-            SizedBox(height: 16),
-            Text(
-              'No posts yet',
-              style: TextStyle(
-                fontSize: 18,
-                color: Colors.grey,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            Text(
-              'Be the first to share something!',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final auth = Provider.of<AuthService>(context, listen: false);
+    final currentUser = auth.currentUser;
 
-    return RefreshIndicator(
-      onRefresh: () async {
-        setState(() {});
-      },
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: GlobalData.posts.length,
-        itemBuilder: (context, index) {
-          return _buildPostCard(GlobalData.posts[index]);
-        },
-      ),
-    );
-  }
-
-  Widget _buildPostCard(Post post) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: GlassmorphicContainer(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Author Header
-              Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: AppColors.wisteria,
-                    ),
-                    child: Center(
-                      child: Text(
-                        post.author[0],
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          post.author,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.darkPurple,
-                          ),
-                        ),
-                        Text(
-                          _formatTime(post.timestamp),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.darkPurple.withOpacity(0.6),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () {},
-                    icon: Icon(
-                      Icons.more_vert,
-                      color: AppColors.darkPurple.withOpacity(0.6),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              // Post Content
-              Text(
-                post.content,
-                style: const TextStyle(
-                  fontSize: 15,
-                  color: AppColors.darkPurple,
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 16),
-              // Actions
-              Row(
-                children: [
-                  _buildActionButton(
-                    icon: Icons.favorite_border,
-                    label: post.likes.toString(),
-                    onTap: () {
-                      setState(() {
-                        post.likes++;
-                      });
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: isDark
+              ? [const Color(0xFF1E0B2C), AppColors.darkBg]
+              : [const Color(0xFFF0EAFF), AppColors.background],
+        ),
+      ),
+      child: Column(
+        children: [
+          _buildHeader(context, isDark),
+          Expanded(
+            child: StreamBuilder<List<Post>>(
+              stream: _postService.getPostsStream(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return _buildLoadingState();
+                }
+                final firestorePosts = snapshot.data ?? [];
+                return RefreshIndicator(
+                  color: AppColors.wisteria,
+                  backgroundColor: isDark ? AppColors.darkCard : AppColors.white,
+                  onRefresh: () async => setState(() {}),
+                  child: ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+                    itemCount: _mockPosts.length + firestorePosts.length,
+                    itemBuilder: (context, i) {
+                      // Mock posts appear at the top
+                      if (i < _mockPosts.length) {
+                        return _MockPostCard(
+                          data: _mockPosts[i],
+                          isDark: isDark,
+                        );
+                      }
+                      // Real Firestore posts below
+                      final post = firestorePosts[i - _mockPosts.length];
+                      return _PostCard(
+                        post: post,
+                        currentUserId: currentUser?.uid ?? '',
+                        postService: _postService,
+                        isDark: isDark,
+                      );
                     },
                   ),
-                  const SizedBox(width: 24),
-                  _buildActionButton(
-                    icon: Icons.chat_bubble_outline,
-                    label: post.comments.toString(),
-                    onTap: () {},
-                  ),
-                  const SizedBox(width: 24),
-                  _buildActionButton(
-                    icon: Icons.share_outlined,
-                    label: 'Share',
-                    onTap: () {},
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildActionButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Row(
-        children: [
-          Icon(
-            icon,
-            size: 20,
-            color: AppColors.darkPurple.withOpacity(0.7),
-          ),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 14,
-              color: AppColors.darkPurple.withOpacity(0.7),
+                );
+              },
             ),
           ),
         ],
@@ -192,16 +164,785 @@ class _FeedPageState extends State<FeedPage> {
     );
   }
 
-  String _formatTime(DateTime dateTime) {
-    final now = DateTime.now();
-    final difference = now.difference(dateTime);
+  Widget _buildHeader(BuildContext context, bool isDark) {
+    final topPad = MediaQuery.of(context).padding.top;
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          stops: const [0.0, 0.45, 1.0],
+          colors: [
+            AppColors.sunglow.withOpacity(isDark ? 0.18 : 0.32),
+            AppColors.sunglow.withOpacity(isDark ? 0.04 : 0.08),
+            Colors.transparent,
+          ],
+        ),
+      ),
+      padding: EdgeInsets.only(
+        top: topPad + 12,
+        left: 16,
+        right: 16,
+        bottom: 14,
+      ),
+      child: Row(
+        children: [
+          _HeaderIconBtn(
+            icon: Icons.menu_rounded,
+            isDark: isDark,
+            onTap: () => PageWithDrawerCallback.of(context)?.onOpenDrawer(),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(22),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                child: Container(
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? Colors.white.withOpacity(0.08)
+                        : Colors.white.withOpacity(0.55),
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(
+                      color: isDark
+                          ? Colors.white.withOpacity(0.12)
+                          : Colors.white.withOpacity(0.7),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const SizedBox(width: 14),
+                      const Icon(Icons.search_rounded,
+                          color: AppColors.mutedText, size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        Provider.of<LanguageProvider>(context).t('search'),
+                        style: const TextStyle(
+                          color: AppColors.mutedText,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          _HeaderIconBtn(
+            icon: Icons.work_outline_rounded,
+            isDark: isDark,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const JobPage()),
+            ),
+          ),
+          const SizedBox(width: 10),
+          GestureDetector(
+            onTap: () {
+              if (_userProfile != null) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ProfilePage(userProfile: _userProfile!),
+                  ),
+                );
+              }
+            },
+            child: _AvatarCircle(
+              name: _userProfile?.name ?? 'U',
+              size: 36,
+              fontSize: 13,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-    if (difference.inMinutes < 60) {
-      return '${difference.inMinutes}m ago';
-    } else if (difference.inHours < 24) {
-      return '${difference.inHours}h ago';
-    } else {
-      return '${difference.inDays}d ago';
-    }
+  Widget _buildLoadingState() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 40,
+            height: 40,
+            child: CircularProgressIndicator(
+              color: AppColors.wisteria,
+              strokeWidth: 2.5,
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Loading feed…',
+            style: TextStyle(
+              color: AppColors.mutedText,
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Header Icon Button ────────────────────────────────────────────────────────
+
+class _HeaderIconBtn extends StatelessWidget {
+  final IconData icon;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _HeaderIconBtn({
+    required this.icon,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+          child: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: isDark
+                  ? Colors.white.withOpacity(0.08)
+                  : Colors.white.withOpacity(0.55),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isDark
+                    ? Colors.white.withOpacity(0.12)
+                    : Colors.white.withOpacity(0.7),
+                width: 1,
+              ),
+            ),
+            child: Icon(
+              icon,
+              color: isDark ? Colors.white : AppColors.darkPurple,
+              size: 22,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Mock Post Card ────────────────────────────────────────────────────────────
+
+class _MockPostCard extends StatefulWidget {
+  final _MockPost data;
+  final bool isDark;
+
+  const _MockPostCard({required this.data, required this.isDark});
+
+  @override
+  State<_MockPostCard> createState() => _MockPostCardState();
+}
+
+class _MockPostCardState extends State<_MockPostCard> {
+  bool _liked = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final d = widget.data;
+    final isDark = widget.isDark;
+    final cardColor = isDark
+        ? Colors.white.withOpacity(0.06)
+        : Colors.white.withOpacity(0.75);
+    final borderColor = isDark
+        ? Colors.white.withOpacity(0.1)
+        : AppColors.wisteria.withOpacity(0.2);
+    final textColor = isDark ? Colors.white : AppColors.darkPurple;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: Container(
+            decoration: BoxDecoration(
+              color: cardColor,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: borderColor, width: 1),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.wisteria.withOpacity(isDark ? 0.04 : 0.08),
+                  blurRadius: 20,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 8, 0),
+                  child: Row(
+                    children: [
+                      _AvatarCircle(
+                          name: d.author, size: 46, fontSize: 18),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              d.author,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: textColor,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              d.role,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.mutedText,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 1),
+                            Text(
+                              d.timeAgo,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: AppColors.mutedText,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.more_horiz_rounded,
+                          color: AppColors.mutedText, size: 20),
+                      const SizedBox(width: 8),
+                    ],
+                  ),
+                ),
+                // Content — expandable caption (Instagram/Telegram style)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                  child: _ExpandableText(text: d.content, isDark: isDark),
+                ),
+                // Optional image
+                if (d.imageUrl != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: ClipRRect(
+                      child: Image.network(
+                        d.imageUrl!,
+                        width: double.infinity,
+                        height: 220,
+                        fit: BoxFit.cover,
+                        loadingBuilder: (_, child, progress) =>
+                            progress == null
+                                ? child
+                                : Container(
+                                    height: 220,
+                                    color:
+                                        AppColors.wisteria.withOpacity(0.1),
+                                    child: const Center(
+                                      child: CircularProgressIndicator(
+                                          color: AppColors.wisteria,
+                                          strokeWidth: 2),
+                                    ),
+                                  ),
+                        errorBuilder: (_, __, ___) => Container(
+                          height: 160,
+                          color: AppColors.wisteria.withOpacity(0.08),
+                          child: const Center(
+                            child: Icon(Icons.image_outlined,
+                                color: AppColors.wisteria, size: 40),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 14),
+                // Separator
+                Container(
+                  height: 1,
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  color: AppColors.mutedText.withOpacity(0.12),
+                ),
+                // Actions
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  child: Row(
+                    children: [
+                      _ActionBtn(
+                        icon: _liked
+                            ? Icons.favorite_rounded
+                            : Icons.favorite_border_rounded,
+                        label: '${d.likes + (_liked ? 1 : 0)}',
+                        color: _liked ? Colors.redAccent : AppColors.mutedText,
+                        onTap: () => setState(() => _liked = !_liked),
+                      ),
+                      _ActionBtn(
+                        icon: Icons.chat_bubble_outline_rounded,
+                        label: '${d.comments}',
+                        color: AppColors.mutedText,
+                        onTap: () {},
+                      ),
+                      _ActionBtn(
+                        icon: Icons.share_outlined,
+                        label: 'Share',
+                        color: AppColors.mutedText,
+                        onTap: () {},
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Firestore Post Card ───────────────────────────────────────────────────────
+
+class _PostCard extends StatefulWidget {
+  final Post post;
+  final String currentUserId;
+  final PostService postService;
+  final bool isDark;
+
+  const _PostCard({
+    required this.post,
+    required this.currentUserId,
+    required this.postService,
+    required this.isDark,
+  });
+
+  @override
+  State<_PostCard> createState() => _PostCardState();
+}
+
+class _PostCardState extends State<_PostCard> {
+  bool _likeLoading = false;
+
+  bool get _isLiked => widget.post.isLikedBy(widget.currentUserId);
+  bool get _isOwn => widget.post.authorId == widget.currentUserId;
+
+  Future<void> _toggleLike() async {
+    if (_likeLoading) return;
+    setState(() => _likeLoading = true);
+    await widget.postService.toggleLike(widget.post.id);
+    if (mounted) setState(() => _likeLoading = false);
+  }
+
+  void _showComments() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => CommentsDialog(post: widget.post),
+    );
+  }
+
+  void _showMenu() {
+    final isDark = widget.isDark;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Container(
+            decoration: BoxDecoration(
+              color: isDark
+                  ? AppColors.darkCard.withOpacity(0.95)
+                  : Colors.white.withOpacity(0.92),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(24)),
+              border: Border.all(
+                  color: isDark
+                      ? Colors.white.withOpacity(0.1)
+                      : Colors.white.withOpacity(0.5),
+                  width: 1),
+            ),
+            child: SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 36,
+                    height: 4,
+                    margin: const EdgeInsets.only(top: 12, bottom: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.mutedText.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  ListTile(
+                    leading: Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.delete_outline_rounded,
+                          color: Colors.red, size: 20),
+                    ),
+                    title: const Text(
+                      'Delete post',
+                      style: TextStyle(
+                          color: Colors.red, fontWeight: FontWeight.w600),
+                    ),
+                    onTap: () async {
+                      Navigator.pop(context);
+                      await widget.postService.deletePost(widget.post.id);
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final post = widget.post;
+    final isDark = widget.isDark;
+    final cardColor = isDark
+        ? Colors.white.withOpacity(0.06)
+        : Colors.white.withOpacity(0.75);
+    final borderColor = isDark
+        ? Colors.white.withOpacity(0.1)
+        : Colors.white.withOpacity(0.6);
+    final textColor = isDark ? Colors.white : AppColors.darkPurple;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: Container(
+            decoration: BoxDecoration(
+              color: cardColor,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: borderColor, width: 1),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.wisteria.withOpacity(isDark ? 0.04 : 0.08),
+                  blurRadius: 20,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 8, 0),
+                  child: Row(
+                    children: [
+                      _AvatarCircle(
+                          name: post.author, size: 46, fontSize: 18),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              post.author,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: textColor,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _formatTime(post.timestamp),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.mutedText,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (_isOwn)
+                        IconButton(
+                          onPressed: _showMenu,
+                          icon: const Icon(
+                            Icons.more_horiz_rounded,
+                            color: AppColors.mutedText,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                // Content — expandable caption (Instagram/Telegram style)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                  child: _ExpandableText(text: post.content, isDark: isDark),
+                ),
+                // Separator
+                Container(
+                  height: 1,
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  color: AppColors.mutedText.withOpacity(0.12),
+                ),
+                // Actions
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  child: Row(
+                    children: [
+                      _ActionBtn(
+                        icon: _isLiked
+                            ? Icons.favorite_rounded
+                            : Icons.favorite_border_rounded,
+                        label: post.likedBy.length.toString(),
+                        color:
+                            _isLiked ? Colors.redAccent : AppColors.mutedText,
+                        onTap: _toggleLike,
+                        loading: _likeLoading,
+                      ),
+                      _ActionBtn(
+                        icon: Icons.chat_bubble_outline_rounded,
+                        label: post.comments.toString(),
+                        color: AppColors.mutedText,
+                        onTap: _showComments,
+                      ),
+                      _ActionBtn(
+                        icon: Icons.share_outlined,
+                        label: 'Share',
+                        color: AppColors.mutedText,
+                        onTap: () {},
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _formatTime(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    return '${dt.day}/${dt.month}/${dt.year}';
+  }
+}
+
+class _ActionBtn extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  final bool loading;
+
+  const _ActionBtn({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+    this.loading = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (loading)
+                SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 1.5,
+                    color: color,
+                  ),
+                )
+              else
+                Icon(icon, size: 20, color: color),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Shared Avatar Widget ─────────────────────────────────────────────────────
+
+class _AvatarCircle extends StatelessWidget {
+  final String name;
+  final double size;
+  final double fontSize;
+
+  const _AvatarCircle({
+    required this.name,
+    required this.size,
+    required this.fontSize,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+    return Container(
+      width: size,
+      height: size,
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.wisteria, AppColors.splashPurple],
+        ),
+      ),
+      child: Center(
+        child: Text(
+          initial,
+          style: TextStyle(
+            color: AppColors.white,
+            fontSize: fontSize,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Expandable caption text ──────────────────────────────────────────────────
+
+/// Shows up to 3 lines of text with a "more" tap to expand,
+/// and a "Show less" tap to collapse. No toggle shown if text fits in 3 lines.
+class _ExpandableText extends StatefulWidget {
+  final String text;
+  final bool isDark;
+  const _ExpandableText({required this.text, required this.isDark});
+
+  @override
+  State<_ExpandableText> createState() => _ExpandableTextState();
+}
+
+class _ExpandableTextState extends State<_ExpandableText> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor = widget.isDark ? Colors.white : AppColors.darkPurple;
+    const style = TextStyle(fontSize: 15, height: 1.6);
+    final colored = style.copyWith(color: textColor);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Measure if text overflows 3 lines
+        final span = TextSpan(text: widget.text, style: colored);
+        final tp = TextPainter(
+          text: span,
+          maxLines: 3,
+          textDirection: TextDirection.ltr,
+        )..layout(maxWidth: constraints.maxWidth);
+        final overflows = tp.didExceedMaxLines;
+
+        if (!overflows) {
+          // Short text — just render it plainly
+          return Text(widget.text, style: colored);
+        }
+
+        if (_expanded) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(widget.text, style: colored),
+              GestureDetector(
+                onTap: () => setState(() => _expanded = false),
+                child: const Padding(
+                  padding: EdgeInsets.only(top: 4),
+                  child: Text(
+                    'Show less',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.wisteria,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
+
+        // Collapsed — 3 lines + "... more" inline
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(widget.text, maxLines: 3, overflow: TextOverflow.ellipsis, style: colored),
+            GestureDetector(
+              onTap: () => setState(() => _expanded = true),
+              child: const Padding(
+                padding: EdgeInsets.only(top: 4),
+                child: Text(
+                  'more',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.wisteria,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 }

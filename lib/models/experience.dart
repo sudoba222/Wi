@@ -39,4 +39,32 @@ class Experience {
     ];
     return months[month - 1];
   }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'position': position,
+      'company': company,
+      'location': location,
+      'startDate': startDate.toIso8601String(),
+      'endDate': endDate?.toIso8601String(),
+      'isCurrent': isCurrent,
+      'description': description,
+      'achievements': achievements,
+    };
+  }
+
+  factory Experience.fromMap(Map<String, dynamic> map) {
+    return Experience(
+      id: map['id'] ?? '',
+      position: map['position'] ?? '',
+      company: map['company'] ?? '',
+      location: map['location'] ?? '',
+      startDate: DateTime.parse(map['startDate']),
+      endDate: map['endDate'] != null ? DateTime.parse(map['endDate']) : null,
+      isCurrent: map['isCurrent'] ?? false,
+      description: map['description'] ?? '',
+      achievements: List<String>.from(map['achievements'] ?? []),
+    );
+  }
 }
