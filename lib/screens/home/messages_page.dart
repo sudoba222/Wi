@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../utils/app_colors.dart';
 import '../../services/global_data.dart';
+import '../../models/conversation.dart';
 import '../chat/chat_screen.dart';
 
 /// Messages list page — shows all in-memory conversations from GlobalData.
@@ -318,7 +319,7 @@ class _SearchBarWithNewChat extends StatelessWidget {
 
 /// A single conversation row — glass card with pin badge, long-press to pin/unpin.
 class _ConversationTile extends StatelessWidget {
-  final dynamic conversation;
+  final Conversation conversation;
   final bool isPinned;
   final bool isDark;
   final VoidCallback onTap;
@@ -381,7 +382,7 @@ class _ConversationTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = conversation.userName as String;
+    final name = conversation.userName;
     final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
 
     return GestureDetector(
@@ -460,7 +461,7 @@ class _ConversationTile extends StatelessWidget {
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          conversation.lastMessage as String,
+                          conversation.lastMessage,
                           style: const TextStyle(fontSize: 13, color: AppColors.mutedText),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -471,7 +472,7 @@ class _ConversationTile extends StatelessWidget {
                   const SizedBox(width: 8),
                   // Timestamp
                   Text(
-                    conversation.lastMessageTime as String,
+                    conversation.lastMessageTime,
                     style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
                   ),
                 ],

@@ -113,7 +113,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               onTap: () {
                 Navigator.pop(context);
-                setState(() => conv.isPinned = !conv.isPinned);
+                if (mounted) setState(() => conv.isPinned = !conv.isPinned);
               },
             ),
             ListTile(
@@ -127,7 +127,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               onTap: () {
                 Navigator.pop(context);
-                setState(() => conv.messages.clear());
+                if (mounted) setState(() => conv.messages.clear());
               },
             ),
             ListTile(

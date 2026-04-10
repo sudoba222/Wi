@@ -53,9 +53,6 @@ class _RegisterPageState extends State<RegisterPage> {
 
       if (result.isSuccess) {
         // Success! AuthWrapper will automatically navigate to HomePage
-        //ignore_for_file: avoid_print
-        print('✅ Account created successfully!');
-
         // Show success message
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

@@ -44,7 +44,7 @@ class _LoginPageState extends State<LoginPage> {
       setState(() => _isLoading = false);
 
       if (result.isSuccess) {
-        print('✅ Login successful!');
+        // AuthWrapper listens to Firebase auth state and navigates automatically
       } else {
         setState(() => _errorMessage = result.message);
         if (mounted) {
