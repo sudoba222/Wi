@@ -1,6 +1,7 @@
 // ignore_for_file: deprecated_member_use
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../utils/app_colors.dart';
 import '../../models/user_profile.dart';
 import '../../models/post.dart';
@@ -17,6 +18,8 @@ class PostsPage extends StatelessWidget {
     final textColor = isDark ? Colors.white : AppColors.darkPurple;
     final subColor =
         isDark ? Colors.white60 : AppColors.darkPurple.withOpacity(0.55);
+
+    final myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -59,18 +62,17 @@ class PostsPage extends StatelessWidget {
             );
           }
 
-          final posts = snapshot.data!.docs
-              .map((d) => Post.fromFirestore(d))
-              .toList();
+          final posts =
+              snapshot.data!.docs.map((d) => Post.fromFirestore(d)).toList();
 
           return ListView.separated(
             padding: const EdgeInsets.all(16),
             itemCount: posts.length,
             separatorBuilder: (_, __) => const SizedBox(height: 12),
             itemBuilder: (context, i) {
-              final post = posts[i];
               return _PostCard(
-                post: post,
+                post: posts[i],
+                isOwner: posts[i].authorId == myUid,
                 cardColor: cardColor,
                 textColor: textColor,
                 subColor: subColor,
@@ -85,10 +87,12 @@ class PostsPage extends StatelessWidget {
 
 class _PostCard extends StatelessWidget {
   final Post post;
+  final bool isOwner;
   final Color cardColor, textColor, subColor;
 
   const _PostCard({
     required this.post,
+    required this.isOwner,
     required this.cardColor,
     required this.textColor,
     required this.subColor,
@@ -100,8 +104,113 @@ class _PostCard extends StatelessWidget {
     if (diff.inHours < 1) return '${diff.inMinutes}m ago';
     if (diff.inDays < 1) return '${diff.inHours}h ago';
     if (diff.inDays < 7) return '${diff.inDays}d ago';
-    final m = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][time.month - 1];
+    final m = [
+      'Jan','Feb','Mar','Apr','May','Jun',
+      'Jul','Aug','Sep','Oct','Nov','Dec'
+    ][time.month - 1];
     return '$m ${time.day}, ${time.year}';
+  }
+
+  Future<void> _editPost(BuildContext context) async {
+    final controller = TextEditingController(text: post.content);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? AppColors.darkCard : Colors.white,
+        title: Text('Edit Post',
+            style: TextStyle(
+                color: isDark ? Colors.white : AppColors.darkPurple,
+                fontWeight: FontWeight.bold)),
+        content: TextField(
+          controller: controller,
+          maxLines: 5,
+          style: TextStyle(color: isDark ? Colors.white : AppColors.darkPurple),
+          decoration: InputDecoration(
+            hintText: 'What\'s on your mind?',
+            hintStyle: TextStyle(
+                color: isDark
+                    ? Colors.white38
+                    : AppColors.darkPurple.withOpacity(0.4)),
+            filled: true,
+            fillColor: isDark
+                ? Colors.white.withOpacity(0.07)
+                : AppColors.background,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel',
+                style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.wisteria,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Save',
+                style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && controller.text.trim().isNotEmpty) {
+      await FirebaseFirestore.instance
+          .collection('posts')
+          .doc(post.id)
+          .update({'content': controller.text.trim()});
+    }
+  }
+
+  Future<void> _deletePost(BuildContext context) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? AppColors.darkCard : Colors.white,
+        title: Text('Delete Post',
+            style: TextStyle(
+                color: isDark ? Colors.white : AppColors.darkPurple,
+                fontWeight: FontWeight.bold)),
+        content: Text('Are you sure you want to delete this post?',
+            style: TextStyle(
+                color: isDark ? Colors.white70 : AppColors.darkPurple)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel',
+                style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Delete',
+                style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await FirebaseFirestore.instance
+          .collection('posts')
+          .doc(post.id)
+          .delete();
+    }
   }
 
   @override
@@ -136,7 +245,8 @@ class _PostCard extends StatelessWidget {
                             ? post.author[0].toUpperCase()
                             : '?',
                         style: const TextStyle(
-                            color: Colors.white, fontWeight: FontWeight.bold),
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold),
                       )
                     : null,
               ),
@@ -155,12 +265,49 @@ class _PostCard extends StatelessWidget {
                   ],
                 ),
               ),
+              // Three-dots menu (own posts only)
+              if (isOwner)
+                PopupMenuButton<String>(
+                  onSelected: (value) {
+                    if (value == 'edit') _editPost(context);
+                    if (value == 'delete') _deletePost(context);
+                  },
+                  icon: Icon(Icons.more_vert, color: subColor, size: 20),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  itemBuilder: (_) => [
+                    PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit_outlined,
+                              size: 18, color: AppColors.wisteria),
+                          const SizedBox(width: 10),
+                          const Text('Edit'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.delete_outline,
+                              size: 18, color: Colors.redAccent),
+                          const SizedBox(width: 10),
+                          const Text('Delete',
+                              style: TextStyle(color: Colors.redAccent)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
             ],
           ),
           const SizedBox(height: 12),
           // Content
           Text(post.content,
-              style: TextStyle(fontSize: 14, color: textColor, height: 1.55)),
+              style:
+                  TextStyle(fontSize: 14, color: textColor, height: 1.55)),
           const SizedBox(height: 12),
           // Engagement row
           Row(
