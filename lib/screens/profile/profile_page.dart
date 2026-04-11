@@ -2,6 +2,8 @@
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../utils/app_colors.dart';
@@ -24,8 +26,8 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   bool _isConnected = false;
+  bool _connectionLoading = false;
   late UserProfile _currentProfile;
-  File? _profileImage;
   bool _isUploadingImage = false;
   final ImagePicker _picker = ImagePicker();
 
@@ -49,6 +51,64 @@ class _ProfilePageState extends State<ProfilePage> {
             _scrollOffset = _scrollController.offset.clamp(0.0, double.infinity));
       }
     });
+    _loadConnectionStatus();
+  }
+
+  Future<void> _loadConnectionStatus() async {
+    if (_currentProfile.isOwnProfile) return;
+    final myUid = FirebaseAuth.instance.currentUser?.uid;
+    if (myUid == null) return;
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(_currentProfile.id)
+        .collection('connections')
+        .doc(myUid)
+        .get();
+    if (mounted) setState(() => _isConnected = doc.exists);
+  }
+
+  Future<void> _toggleConnection() async {
+    final myUid = FirebaseAuth.instance.currentUser?.uid;
+    if (myUid == null) return;
+    setState(() => _connectionLoading = true);
+    try {
+      final firestore = FirebaseFirestore.instance;
+      final profileConnRef = firestore
+          .collection('users')
+          .doc(_currentProfile.id)
+          .collection('connections')
+          .doc(myUid);
+      final myConnRef = firestore
+          .collection('users')
+          .doc(myUid)
+          .collection('connections')
+          .doc(_currentProfile.id);
+
+      if (_isConnected) {
+        await profileConnRef.delete();
+        await myConnRef.delete();
+      } else {
+        final myDoc = await firestore.collection('users').doc(myUid).get();
+        final myData = myDoc.data() ?? {};
+        await profileConnRef.set({
+          'connectedAt': FieldValue.serverTimestamp(),
+          'name': myData['fullName'] ?? '',
+          'jobTitle': myData['jobTitle'] ?? '',
+          'company': myData['company'] ?? '',
+          'profilePicture': myData['profilePicture'] ?? '',
+        });
+        await myConnRef.set({
+          'connectedAt': FieldValue.serverTimestamp(),
+          'name': _currentProfile.name,
+          'jobTitle': _currentProfile.jobTitle,
+          'company': _currentProfile.company,
+          'profilePicture': _currentProfile.profilePicture,
+        });
+      }
+      if (mounted) setState(() => _isConnected = !_isConnected);
+    } finally {
+      if (mounted) setState(() => _connectionLoading = false);
+    }
   }
 
   @override
@@ -181,16 +241,22 @@ class _ProfilePageState extends State<ProfilePage> {
       final currentH = constraints.maxHeight; // grows beyond 300 on pull-down
       final statusH = MediaQuery.of(context).padding.top;
 
-      // expandProgress: 0 = at rest, 1 = photo fills banner as rectangle
-      final expandProgress = ((currentH - _expandedHeight) / 80.0).clamp(0.0, 1.0);
+      // expandProgress: 0 = at rest, 1 = photo fills banner as rectangle.
+      // On mobile, LayoutBuilder reports expandedHeight + statusBarHeight at
+      // rest (the SliverAppBar includes the status bar area in its height).
+      // We subtract statusH so the morph only starts on actual overscroll.
+      final restHeight = _expandedHeight + statusH;
+      final expandProgress = ((currentH - restHeight) / 80.0).clamp(0.0, 1.0);
 
       // ── Default circle avatar metrics ─────────────────────────────────────
       const defaultSize = 112.0;
       const defaultRingPad = 3.0;
       const defaultGapPad = 2.0;
-      // Centered horizontally; shifted up from vertical center to leave room for text
+      // Centered horizontally; shifted down by statusH so avatar sits in the
+      // visible banner area (below the status bar) on mobile.
       final defaultX = (screenW - defaultSize) / 2;
-      const defaultY = _expandedHeight / 2 - defaultSize / 2 - 28;
+      final defaultY =
+          statusH + ((_expandedHeight - statusH) / 2 - defaultSize / 2 - 28);
 
       // ── Collapse: circle shrinks and floats up into toolbar ───────────────
       const collapsedSize = 40.0;
@@ -427,9 +493,6 @@ class _ProfilePageState extends State<ProfilePage> {
                 color: Colors.white, strokeWidth: 2)),
       );
     }
-    if (_profileImage != null) {
-      return Image.file(_profileImage!, fit: BoxFit.cover);
-    }
     if (profile.profilePicture.isNotEmpty) {
       return Image.network(
         profile.profilePicture,
@@ -489,8 +552,8 @@ class _ProfilePageState extends State<ProfilePage> {
                         ? Icons.how_to_reg_outlined
                         : Icons.person_add_alt_1_outlined,
                     isPrimary: !_isConnected,
-                    onTap: () =>
-                        setState(() => _isConnected = !_isConnected),
+                    isLoading: _connectionLoading,
+                    onTap: _toggleConnection,
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -512,10 +575,15 @@ class _ProfilePageState extends State<ProfilePage> {
     required IconData icon,
     required bool isPrimary,
     required VoidCallback onTap,
+    bool isLoading = false,
   }) {
     return ElevatedButton.icon(
-      onPressed: onTap,
-      icon: Icon(icon, size: 16),
+      onPressed: isLoading ? null : onTap,
+      icon: isLoading
+          ? const SizedBox(
+              width: 14, height: 14,
+              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+          : Icon(icon, size: 16),
       label: Text(label,
           style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
       style: ElevatedButton.styleFrom(
@@ -540,34 +608,43 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Widget _buildStatsRow(UserProfile profile, Color cardColor, Color textColor,
       Color subTextColor) {
+    final firestore = FirebaseFirestore.instance;
     return _card(
       cardColor: cardColor,
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: IntrinsicHeight(
         child: Row(
           children: [
-            _statItem(
-              value: profile.connections.toString(),
+            _liveStatItem(
+              stream: firestore
+                  .collection('users')
+                  .doc(profile.id)
+                  .collection('connections')
+                  .snapshots(),
               label: 'Connections',
-              textColor: textColor,
               subTextColor: subTextColor,
               onTap: () => Navigator.push(context,
                   MaterialPageRoute(builder: (_) => ConnectionsPage(profile: profile))),
             ),
             _verticalDivider(subTextColor),
-            _statItem(
-              value: profile.posts.toString(),
+            _liveStatItem(
+              stream: firestore
+                  .collection('posts')
+                  .where('authorId', isEqualTo: profile.id)
+                  .snapshots(),
               label: 'Posts',
-              textColor: textColor,
               subTextColor: subTextColor,
               onTap: () => Navigator.push(context,
                   MaterialPageRoute(builder: (_) => PostsPage(profile: profile))),
             ),
             _verticalDivider(subTextColor),
-            _statItem(
-              value: profile.followers.toString(),
+            _liveStatItem(
+              stream: firestore
+                  .collection('users')
+                  .doc(profile.id)
+                  .collection('followers')
+                  .snapshots(),
               label: 'Followers',
-              textColor: textColor,
               subTextColor: subTextColor,
               onTap: () => Navigator.push(context,
                   MaterialPageRoute(builder: (_) => FollowersPage(profile: profile))),
@@ -578,28 +655,34 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _statItem({
-    required String value,
+  Widget _liveStatItem({
+    required Stream<QuerySnapshot> stream,
     required String label,
-    required Color textColor,
     required Color subTextColor,
     required VoidCallback onTap,
   }) {
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(value,
-                style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.wisteria)),
-            const SizedBox(height: 3),
-            Text(label,
-                style: TextStyle(fontSize: 11, color: subTextColor)),
-          ],
+        child: StreamBuilder<QuerySnapshot>(
+          stream: stream,
+          builder: (context, snapshot) {
+            final count = snapshot.data?.docs.length ?? 0;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  count.toString(),
+                  style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.wisteria),
+                ),
+                const SizedBox(height: 3),
+                Text(label, style: TextStyle(fontSize: 11, color: subTextColor)),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -1027,8 +1110,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     icon: Icons.photo_library,
                     label: 'Gallery',
                     onTap: () => _pickImage(ImageSource.gallery)),
-                if (_profileImage != null ||
-                    _currentProfile.profilePicture.isNotEmpty)
+                if (_currentProfile.profilePicture.isNotEmpty)
                   _buildImageOption(
                       icon: Icons.delete,
                       label: 'Remove',
@@ -1080,88 +1162,109 @@ class _ProfilePageState extends State<ProfilePage> {
   // ─────────────────────────────────────────────────────────────────────────────
 
   Future<void> _pickImage(ImageSource source) async {
+    XFile? pickedFile;
     try {
-      final XFile? pickedFile = await _picker.pickImage(
+      pickedFile = await _picker.pickImage(
         source: source,
         maxWidth: 500,
         maxHeight: 500,
         imageQuality: 80,
       );
+    } catch (_) {
+      // Permission denied or picker error — just close the sheet
+      if (mounted) Navigator.pop(context);
+      return;
+    }
 
-      if (pickedFile != null) {
-        setState(() => _isUploadingImage = true);
-        Navigator.pop(context);
+    if (pickedFile == null) {
+      // User cancelled the picker
+      if (mounted) Navigator.pop(context);
+      return;
+    }
 
-        final cloudinaryService = CloudinaryService();
-        final imageUrl = await cloudinaryService
-            .uploadProfilePicture(File(pickedFile.path));
+    // Close the bottom sheet before uploading
+    if (mounted) Navigator.pop(context);
+    setState(() => _isUploadingImage = true);
 
-        if (imageUrl != null) {
-          final authService =
-              Provider.of<AuthService>(context, listen: false);
-          final uid = authService.currentUser?.uid;
+    try {
+      final cloudinaryService = CloudinaryService();
+      final imageUrl = await cloudinaryService
+          .uploadProfilePicture(File(pickedFile.path));
 
-          if (uid != null) {
-            await authService.firestore
-                .collection('users')
-                .doc(uid)
-                .update({'profilePicture': imageUrl});
-          }
+      if (!mounted) return;
 
-          setState(() {
-            _profileImage = File(pickedFile.path);
-            _currentProfile = UserProfile(
-              id: _currentProfile.id,
-              name: _currentProfile.name,
-              jobTitle: _currentProfile.jobTitle,
-              company: _currentProfile.company,
-              location: _currentProfile.location,
-              bio: _currentProfile.bio,
-              profilePicture: imageUrl,
-              connections: _currentProfile.connections,
-              posts: _currentProfile.posts,
-              followers: _currentProfile.followers,
-              experience: _currentProfile.experience,
-              education: _currentProfile.education,
-              skills: _currentProfile.skills,
-              isOwnProfile: _currentProfile.isOwnProfile,
-            );
-            _isUploadingImage = false;
-          });
-
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Profile picture updated successfully!'),
-                backgroundColor: Colors.green,
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-          }
-        } else {
-          setState(() => _isUploadingImage = false);
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Failed to upload image. Please try again.'),
-                backgroundColor: Colors.red,
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-          }
+      if (imageUrl != null) {
+        final authService =
+            Provider.of<AuthService>(context, listen: false);
+        final uid = authService.currentUser?.uid;
+        if (uid != null) {
+          await authService.firestore
+              .collection('users')
+              .doc(uid)
+              .update({'profilePicture': imageUrl});
         }
+        if (!mounted) return;
+        setState(() {
+          _currentProfile = UserProfile(
+            id: _currentProfile.id,
+            name: _currentProfile.name,
+            jobTitle: _currentProfile.jobTitle,
+            company: _currentProfile.company,
+            location: _currentProfile.location,
+            bio: _currentProfile.bio,
+            profilePicture: imageUrl,
+            connections: _currentProfile.connections,
+            posts: _currentProfile.posts,
+            followers: _currentProfile.followers,
+            experience: _currentProfile.experience,
+            education: _currentProfile.education,
+            skills: _currentProfile.skills,
+            isOwnProfile: _currentProfile.isOwnProfile,
+          );
+          _isUploadingImage = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profile picture updated successfully!'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       } else {
-        Navigator.pop(context);
+        setState(() => _isUploadingImage = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to upload image. Please try again.'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() => _isUploadingImage = false);
-      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Upload error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
-  void _removeProfilePicture() {
+  Future<void> _removeProfilePicture() async {
+    Navigator.pop(context);
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final uid = authService.currentUser?.uid;
+    if (uid != null) {
+      await authService.firestore
+          .collection('users')
+          .doc(uid)
+          .update({'profilePicture': ''});
+    }
+    if (!mounted) return;
     setState(() {
-      _profileImage = null;
       _currentProfile = UserProfile(
         id: _currentProfile.id,
         name: _currentProfile.name,
@@ -1179,7 +1282,6 @@ class _ProfilePageState extends State<ProfilePage> {
         isOwnProfile: _currentProfile.isOwnProfile,
       );
     });
-    Navigator.pop(context);
   }
 
   // ─────────────────────────────────────────────────────────────────────────────

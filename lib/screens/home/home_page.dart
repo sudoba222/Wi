@@ -55,7 +55,7 @@ class _HomePageState extends State<HomePage> {
         onOpenDrawer: openDrawer,
         child: IndexedStack(index: _currentIndex, children: _pages),
       ),
-      drawer: _AppDrawer(userProfile: _userProfile),
+      drawer: _AppDrawer(userProfile: _userProfile, onProfileUpdated: _loadProfile),
       bottomNavigationBar: _BottomBar(currentIndex: _currentIndex, onTap: _onTap, onPost: _openPost),
     );
   }
@@ -76,7 +76,8 @@ class PageWithDrawerCallback extends InheritedWidget {
 // Side drawer — profile header, nav shortcuts, dark mode, language, help, sign-out
 class _AppDrawer extends StatelessWidget {
   final UserProfile? userProfile;
-  const _AppDrawer({this.userProfile});
+  final VoidCallback? onProfileUpdated;
+  const _AppDrawer({this.userProfile, this.onProfileUpdated});
 
   @override
   Widget build(BuildContext context) {
@@ -103,11 +104,14 @@ class _AppDrawer extends StatelessWidget {
               child: Row(
                 children: [
                   GestureDetector(
-                    onTap: () {
+                    onTap: () async {
                       Navigator.pop(context);
-                      if (userProfile != null) Navigator.push(context, MaterialPageRoute(builder: (_) => ProfilePage(userProfile: userProfile!)));
+                      if (userProfile != null) {
+                        await Navigator.push(context, MaterialPageRoute(builder: (_) => ProfilePage(userProfile: userProfile!)));
+                        onProfileUpdated?.call();
+                      }
                     },
-                    child: _GradAvatar(name: userProfile?.name ?? 'U', size: 54, fontSize: 20),
+                    child: _GradAvatar(name: userProfile?.name ?? 'U', size: 54, fontSize: 20, photoUrl: userProfile?.profilePicture),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -267,13 +271,24 @@ class _LangPill extends StatelessWidget {
 // Gradient avatar circle
 class _GradAvatar extends StatelessWidget {
   final String name; final double size; final double fontSize;
-  const _GradAvatar({required this.name, required this.size, required this.fontSize});
+  final String? photoUrl;
+  const _GradAvatar({required this.name, required this.size, required this.fontSize, this.photoUrl});
   @override
-  Widget build(BuildContext context) => Container(
-    width: size, height: size,
-    decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [AppColors.wisteria, AppColors.splashPurple])),
-    child: Center(child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?', style: TextStyle(color: Colors.white, fontSize: fontSize, fontWeight: FontWeight.w700))),
-  );
+  Widget build(BuildContext context) {
+    final hasPhoto = photoUrl != null && photoUrl!.isNotEmpty;
+    return Container(
+      width: size, height: size,
+      decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [AppColors.wisteria, AppColors.splashPurple])),
+      child: ClipOval(
+        child: hasPhoto
+            ? Image.network(photoUrl!, fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Center(child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
+                    style: TextStyle(color: Colors.white, fontSize: fontSize, fontWeight: FontWeight.w700))))
+            : Center(child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
+                style: TextStyle(color: Colors.white, fontSize: fontSize, fontWeight: FontWeight.w700))),
+      ),
+    );
+  }
 }
 
 // Floating bottom nav pill

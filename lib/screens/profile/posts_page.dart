@@ -40,7 +40,6 @@ class PostsPage extends StatelessWidget {
         stream: FirebaseFirestore.instance
             .collection('posts')
             .where('authorId', isEqualTo: profile.id)
-            .orderBy('timestamp', descending: true)
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -62,8 +61,10 @@ class PostsPage extends StatelessWidget {
             );
           }
 
-          final posts =
-              snapshot.data!.docs.map((d) => Post.fromFirestore(d)).toList();
+          final posts = snapshot.data!.docs
+              .map((d) => Post.fromFirestore(d))
+              .toList()
+            ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
 
           return ListView.separated(
             padding: const EdgeInsets.all(16),
@@ -146,8 +147,9 @@ class _PostCard extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel',
-                style: TextStyle(color: Colors.white54)),
+            child: Text('Cancel',
+                style: TextStyle(
+                    color: isDark ? Colors.white70 : AppColors.darkPurple)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
@@ -188,8 +190,9 @@ class _PostCard extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel',
-                style: TextStyle(color: Colors.white54)),
+            child: Text('Cancel',
+                style: TextStyle(
+                    color: isDark ? Colors.white70 : AppColors.darkPurple)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
