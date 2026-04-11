@@ -18,28 +18,41 @@ class MessagesPage extends StatefulWidget {
 
 class _MessagesPageState extends State<MessagesPage> {
   String _searchQuery = '';
-  final Set<String> _pinnedIds = {};
+  Set<String> _pinnedIds = {};
+  @override
+void initState() {
+  super.initState();
+  _loadPinnedConversations();
+}
 
-  void _togglePin(String convId) {
-    setState(() {
-      if (_pinnedIds.contains(convId)) {
-        _pinnedIds.remove(convId);
-      } else {
-        if (_pinnedIds.length >= 3) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('You can pin up to 3 chats only'),
-              backgroundColor: AppColors.darkPurple,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          );
-          return;
-        }
-        _pinnedIds.add(convId);
-      }
-    });
+void _loadPinnedConversations() {
+  final chatService = Provider.of<ChatService>(context, listen: false);
+  chatService.getPinnedConversationsStream().listen((pinned) {
+    if (mounted) setState(() => _pinnedIds = pinned);
+  });
+}
+
+  void _togglePin(String convId) async {
+  final chatService = Provider.of<ChatService>(context, listen: false);
+  if (_pinnedIds.contains(convId)) {
+    setState(() => _pinnedIds.remove(convId));
+    await chatService.togglePin(convId, false);
+  } else {
+    if (_pinnedIds.length >= 3) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('You can pin up to 3 chats only'),
+          backgroundColor: AppColors.darkPurple,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+      return;
+    }
+    setState(() => _pinnedIds.add(convId));
+    await chatService.togglePin(convId, true);
   }
+}
 
   void _showNewChatSheet() {
   final chatService = Provider.of<ChatService>(context, listen: false);
@@ -59,10 +72,12 @@ class _MessagesPageState extends State<MessagesPage> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => ChatScreen(
+                    builder: (_) => ChatScreen(
                     conversationId: convId,
                     otherUserName: otherUserName,
                     otherUserId: otherUserId,
+                    isPinned: _pinnedIds.contains(convId),
+                    onTogglePin: () => _togglePin(convId),
                   ),
                 ),
               );
@@ -80,10 +95,12 @@ class _MessagesPageState extends State<MessagesPage> {
       context,
       MaterialPageRoute(
         builder: (_) => ChatScreen(
-          conversationId: conv.id,
-          otherUserName: conv.userName,
-          otherUserId: conv.otherUserId,
-        ),
+            conversationId: conv.id,
+            otherUserName: conv.userName,
+            otherUserId: conv.otherUserId,
+            isPinned: _pinnedIds.contains(conv.id),
+            onTogglePin: () => _togglePin(conv.id),
+          ),
       ),
     );
   }

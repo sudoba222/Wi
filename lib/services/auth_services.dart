@@ -144,6 +144,21 @@ class AuthService {
       return null;
     }
   }
+  Future<void> setUserOnline() async {
+  if (currentUser == null) return;
+  await firestore.collection('users').doc(currentUser!.uid).update({
+    'online': true,
+    'lastSeen': FieldValue.serverTimestamp(),
+  });
+  }
+
+  Future<void> setUserOffline() async {
+  if (currentUser == null) return;
+  await firestore.collection('users').doc(currentUser!.uid).update({
+    'online': false,
+    'lastSeen': FieldValue.serverTimestamp(),
+  });
+  }
 
   Future<void> signOut() async {
     await _auth.signOut();

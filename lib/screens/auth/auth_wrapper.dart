@@ -15,21 +15,18 @@ class AuthWrapper extends StatelessWidget {
     return StreamBuilder<User?>(
       stream: authService.authStateChanges,
       builder: (context, snapshot) {
-        // Still loading
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(),
-            ),
+            body: Center(child: CircularProgressIndicator()),
           );
         }
 
-        // User is logged in
         if (snapshot.hasData && snapshot.data != null) {
+          // Set user online when they log in
+          authService.setUserOnline();
           return const HomePage();
         }
 
-        // User is not logged in
         return const LoginPage();
       },
     );
