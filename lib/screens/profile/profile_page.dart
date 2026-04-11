@@ -25,7 +25,6 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   bool _isConnected = false;
   late UserProfile _currentProfile;
-  File? _profileImage;
   bool _isUploadingImage = false;
   final ImagePicker _picker = ImagePicker();
 
@@ -426,9 +425,6 @@ class _ProfilePageState extends State<ProfilePage> {
             child: CircularProgressIndicator(
                 color: Colors.white, strokeWidth: 2)),
       );
-    }
-    if (_profileImage != null) {
-      return Image.file(_profileImage!, fit: BoxFit.cover);
     }
     if (profile.profilePicture.isNotEmpty) {
       return Image.network(
@@ -1027,8 +1023,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     icon: Icons.photo_library,
                     label: 'Gallery',
                     onTap: () => _pickImage(ImageSource.gallery)),
-                if (_profileImage != null ||
-                    _currentProfile.profilePicture.isNotEmpty)
+                if (_currentProfile.profilePicture.isNotEmpty)
                   _buildImageOption(
                       icon: Icons.delete,
                       label: 'Remove',
@@ -1109,7 +1104,6 @@ class _ProfilePageState extends State<ProfilePage> {
           }
 
           setState(() {
-            _profileImage = File(pickedFile.path);
             _currentProfile = UserProfile(
               id: _currentProfile.id,
               name: _currentProfile.name,
@@ -1161,7 +1155,6 @@ class _ProfilePageState extends State<ProfilePage> {
 
   void _removeProfilePicture() {
     setState(() {
-      _profileImage = null;
       _currentProfile = UserProfile(
         id: _currentProfile.id,
         name: _currentProfile.name,
