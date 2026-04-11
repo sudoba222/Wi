@@ -111,7 +111,7 @@ class _AppDrawer extends StatelessWidget {
                         onProfileUpdated?.call();
                       }
                     },
-                    child: _GradAvatar(name: userProfile?.name ?? 'U', size: 54, fontSize: 20),
+                    child: _GradAvatar(name: userProfile?.name ?? 'U', size: 54, fontSize: 20, photoUrl: userProfile?.profilePicture),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -271,13 +271,24 @@ class _LangPill extends StatelessWidget {
 // Gradient avatar circle
 class _GradAvatar extends StatelessWidget {
   final String name; final double size; final double fontSize;
-  const _GradAvatar({required this.name, required this.size, required this.fontSize});
+  final String? photoUrl;
+  const _GradAvatar({required this.name, required this.size, required this.fontSize, this.photoUrl});
   @override
-  Widget build(BuildContext context) => Container(
-    width: size, height: size,
-    decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [AppColors.wisteria, AppColors.splashPurple])),
-    child: Center(child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?', style: TextStyle(color: Colors.white, fontSize: fontSize, fontWeight: FontWeight.w700))),
-  );
+  Widget build(BuildContext context) {
+    final hasPhoto = photoUrl != null && photoUrl!.isNotEmpty;
+    return Container(
+      width: size, height: size,
+      decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [AppColors.wisteria, AppColors.splashPurple])),
+      child: ClipOval(
+        child: hasPhoto
+            ? Image.network(photoUrl!, fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Center(child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
+                    style: TextStyle(color: Colors.white, fontSize: fontSize, fontWeight: FontWeight.w700))))
+            : Center(child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
+                style: TextStyle(color: Colors.white, fontSize: fontSize, fontWeight: FontWeight.w700))),
+      ),
+    );
+  }
 }
 
 // Floating bottom nav pill
