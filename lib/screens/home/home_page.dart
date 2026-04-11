@@ -55,7 +55,7 @@ class _HomePageState extends State<HomePage> {
         onOpenDrawer: openDrawer,
         child: IndexedStack(index: _currentIndex, children: _pages),
       ),
-      drawer: _AppDrawer(userProfile: _userProfile),
+      drawer: _AppDrawer(userProfile: _userProfile, onProfileUpdated: _loadProfile),
       bottomNavigationBar: _BottomBar(currentIndex: _currentIndex, onTap: _onTap, onPost: _openPost),
     );
   }
@@ -76,7 +76,8 @@ class PageWithDrawerCallback extends InheritedWidget {
 // Side drawer — profile header, nav shortcuts, dark mode, language, help, sign-out
 class _AppDrawer extends StatelessWidget {
   final UserProfile? userProfile;
-  const _AppDrawer({this.userProfile});
+  final VoidCallback? onProfileUpdated;
+  const _AppDrawer({this.userProfile, this.onProfileUpdated});
 
   @override
   Widget build(BuildContext context) {
@@ -103,9 +104,12 @@ class _AppDrawer extends StatelessWidget {
               child: Row(
                 children: [
                   GestureDetector(
-                    onTap: () {
+                    onTap: () async {
                       Navigator.pop(context);
-                      if (userProfile != null) Navigator.push(context, MaterialPageRoute(builder: (_) => ProfilePage(userProfile: userProfile!)));
+                      if (userProfile != null) {
+                        await Navigator.push(context, MaterialPageRoute(builder: (_) => ProfilePage(userProfile: userProfile!)));
+                        onProfileUpdated?.call();
+                      }
                     },
                     child: _GradAvatar(name: userProfile?.name ?? 'U', size: 54, fontSize: 20),
                   ),
