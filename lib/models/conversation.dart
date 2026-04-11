@@ -1,28 +1,47 @@
-import 'message.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// In-memory conversation model used by GlobalData and MessagesPage.
 class Conversation {
   final String id;
   final String userName;
-  final List<Message> messages;
-
-  /// Whether this chat is pinned to the top (max 3 allowed).
+  final String otherUserId;
+  final String otherUserProfilePicture;
   bool isPinned;
+  String lastMessage;
+  String lastMessageTime;
 
   Conversation({
     required this.id,
     required this.userName,
-    required this.messages,
+    required this.otherUserId,
+    this.otherUserProfilePicture = '',
     this.isPinned = false,
+    this.lastMessage = 'No messages yet',
+    this.lastMessageTime = '',
   });
 
-  String get lastMessage {
-    if (messages.isEmpty) return 'No messages yet';
-    return messages.last.text;
-  }
+  factory Conversation.fromFirestore(
+    DocumentSnapshot doc,
+    String currentUserId,
+    String otherUserName,
+    String otherUserId,
+    String otherUserProfilePicture,
+  ) {
+    final data = doc.data() as Map<String, dynamic>;
+    final timestamp = (data['lastMessageTime'] as Timestamp?)?.toDate();
+    String timeStr = '';
+    if (timestamp != null) {
+      final hour = timestamp.hour.toString().padLeft(2, '0');
+      final minute = timestamp.minute.toString().padLeft(2, '0');
+      timeStr = '$hour:$minute';
+    }
 
-  String get lastMessageTime {
-    if (messages.isEmpty) return 'Now';
-    return messages.last.time;
+    return Conversation(
+      id: doc.id,
+      userName: otherUserName,
+      otherUserId: otherUserId,
+      otherUserProfilePicture: otherUserProfilePicture,
+      lastMessage: data['lastMessage'] ?? 'No messages yet',
+      lastMessageTime: timeStr,
+    );
   }
 }
