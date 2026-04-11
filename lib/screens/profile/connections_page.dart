@@ -5,25 +5,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../utils/app_colors.dart';
 import '../../models/user_profile.dart';
 
-class ConnectionsPage extends StatefulWidget {
+class ConnectionsPage extends StatelessWidget {
   final UserProfile profile;
   const ConnectionsPage({super.key, required this.profile});
-
-  @override
-  State<ConnectionsPage> createState() => _ConnectionsPageState();
-}
-
-class _ConnectionsPageState extends State<ConnectionsPage> {
-  final Set<String> _removed = {};
-
-  Stream<QuerySnapshot> get _usersStream {
-    final myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
-    return FirebaseFirestore.instance
-        .collection('users')
-        .where('uid', isNotEqualTo: myUid)
-        .limit(50)
-        .snapshots();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,6 +18,9 @@ class _ConnectionsPageState extends State<ConnectionsPage> {
     final subColor =
         isDark ? Colors.white60 : AppColors.darkPurple.withOpacity(0.55);
 
+    final myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final isOwnProfile = profile.id == myUid;
+
     return Scaffold(
       backgroundColor: bgColor,
       appBar: AppBar(
@@ -43,14 +30,29 @@ class _ConnectionsPageState extends State<ConnectionsPage> {
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
         ),
-        title: Text(
-          '${widget.profile.connections} Connections',
-          style: const TextStyle(
-              color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+        title: StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('users')
+              .doc(profile.id)
+              .collection('connections')
+              .snapshots(),
+          builder: (context, snapshot) {
+            final count = snapshot.data?.docs.length ?? 0;
+            return Text(
+              '$count Connections',
+              style: const TextStyle(
+                  color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+            );
+          },
         ),
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: _usersStream,
+        stream: FirebaseFirestore.instance
+            .collection('users')
+            .doc(profile.id)
+            .collection('connections')
+            .orderBy('connectedAt', descending: true)
+            .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(
@@ -61,13 +63,7 @@ class _ConnectionsPageState extends State<ConnectionsPage> {
             return _emptyState('No connections yet', subColor);
           }
 
-          final docs = snapshot.data!.docs
-              .where((d) => !_removed.contains(d.id))
-              .toList();
-
-          if (docs.isEmpty) {
-            return _emptyState('No connections', subColor);
-          }
+          final docs = snapshot.data!.docs;
 
           return ListView.separated(
             padding: const EdgeInsets.all(16),
@@ -76,7 +72,7 @@ class _ConnectionsPageState extends State<ConnectionsPage> {
             itemBuilder: (context, i) {
               final data = docs[i].data() as Map<String, dynamic>;
               final uid = docs[i].id;
-              final name = data['fullName'] as String? ?? 'Unknown';
+              final name = data['name'] as String? ?? 'Unknown';
               final jobTitle = data['jobTitle'] as String? ?? '';
               final company = data['company'] as String? ?? '';
               final pic = data['profilePicture'] as String? ?? '';
@@ -108,9 +104,7 @@ class _ConnectionsPageState extends State<ConnectionsPage> {
                           pic.isNotEmpty ? NetworkImage(pic) : null,
                       child: pic.isEmpty
                           ? Text(
-                              name.isNotEmpty
-                                  ? name[0].toUpperCase()
-                                  : '?',
+                              name.isNotEmpty ? name[0].toUpperCase() : '?',
                               style: const TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.bold,
@@ -135,22 +129,12 @@ class _ConnectionsPageState extends State<ConnectionsPage> {
                         ],
                       ),
                     ),
-                    TextButton(
-                      onPressed: () =>
-                          setState(() => _removed.add(uid)),
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.redAccent,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                          side: const BorderSide(color: Colors.redAccent),
-                        ),
+                    if (isOwnProfile)
+                      _RemoveButton(
+                        profileId: profile.id,
+                        connectionUid: uid,
+                        subColor: subColor,
                       ),
-                      child: const Text('Remove',
-                          style: TextStyle(
-                              fontSize: 13, fontWeight: FontWeight.w600)),
-                    ),
                   ],
                 ),
               );
@@ -171,6 +155,68 @@ class _ConnectionsPageState extends State<ConnectionsPage> {
           Text(text, style: TextStyle(fontSize: 16, color: subColor)),
         ],
       ),
+    );
+  }
+}
+
+class _RemoveButton extends StatefulWidget {
+  final String profileId;
+  final String connectionUid;
+  final Color subColor;
+
+  const _RemoveButton({
+    required this.profileId,
+    required this.connectionUid,
+    required this.subColor,
+  });
+
+  @override
+  State<_RemoveButton> createState() => _RemoveButtonState();
+}
+
+class _RemoveButtonState extends State<_RemoveButton> {
+  bool _loading = false;
+
+  Future<void> _remove() async {
+    setState(() => _loading = true);
+    try {
+      final firestore = FirebaseFirestore.instance;
+      await firestore
+          .collection('users')
+          .doc(widget.profileId)
+          .collection('connections')
+          .doc(widget.connectionUid)
+          .delete();
+      await firestore
+          .collection('users')
+          .doc(widget.connectionUid)
+          .collection('connections')
+          .doc(widget.profileId)
+          .delete();
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const SizedBox(
+          width: 18, height: 18,
+          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.redAccent));
+    }
+    return TextButton(
+      onPressed: _remove,
+      style: TextButton.styleFrom(
+        foregroundColor: Colors.redAccent,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: Colors.redAccent),
+        ),
+      ),
+      child: const Text('Remove',
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
     );
   }
 }

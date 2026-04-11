@@ -1,29 +1,12 @@
 // ignore_for_file: deprecated_member_use
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../../utils/app_colors.dart';
 import '../../models/user_profile.dart';
 
-class FollowersPage extends StatefulWidget {
+class FollowersPage extends StatelessWidget {
   final UserProfile profile;
   const FollowersPage({super.key, required this.profile});
-
-  @override
-  State<FollowersPage> createState() => _FollowersPageState();
-}
-
-class _FollowersPageState extends State<FollowersPage> {
-  final Set<String> _unfollowed = {};
-
-  Stream<QuerySnapshot> get _usersStream {
-    final myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
-    return FirebaseFirestore.instance
-        .collection('users')
-        .where('uid', isNotEqualTo: myUid)
-        .limit(50)
-        .snapshots();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,14 +26,29 @@ class _FollowersPageState extends State<FollowersPage> {
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
         ),
-        title: Text(
-          '${widget.profile.followers} Followers',
-          style: const TextStyle(
-              color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+        title: StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('users')
+              .doc(profile.id)
+              .collection('followers')
+              .snapshots(),
+          builder: (context, snapshot) {
+            final count = snapshot.data?.docs.length ?? 0;
+            return Text(
+              '$count Followers',
+              style: const TextStyle(
+                  color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+            );
+          },
         ),
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: _usersStream,
+        stream: FirebaseFirestore.instance
+            .collection('users')
+            .doc(profile.id)
+            .collection('followers')
+            .orderBy('followedAt', descending: true)
+            .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(
@@ -61,13 +59,7 @@ class _FollowersPageState extends State<FollowersPage> {
             return _emptyState('No followers yet', subColor);
           }
 
-          final docs = snapshot.data!.docs
-              .where((d) => !_unfollowed.contains(d.id))
-              .toList();
-
-          if (docs.isEmpty) {
-            return _emptyState('No followers', subColor);
-          }
+          final docs = snapshot.data!.docs;
 
           return ListView.separated(
             padding: const EdgeInsets.all(16),
@@ -75,8 +67,7 @@ class _FollowersPageState extends State<FollowersPage> {
             separatorBuilder: (_, __) => const SizedBox(height: 10),
             itemBuilder: (context, i) {
               final data = docs[i].data() as Map<String, dynamic>;
-              final uid = docs[i].id;
-              final name = data['fullName'] as String? ?? 'Unknown';
+              final name = data['name'] as String? ?? 'Unknown';
               final jobTitle = data['jobTitle'] as String? ?? '';
               final pic = data['profilePicture'] as String? ?? '';
 
@@ -102,9 +93,7 @@ class _FollowersPageState extends State<FollowersPage> {
                           pic.isNotEmpty ? NetworkImage(pic) : null,
                       child: pic.isEmpty
                           ? Text(
-                              name.isNotEmpty
-                                  ? name[0].toUpperCase()
-                                  : '?',
+                              name.isNotEmpty ? name[0].toUpperCase() : '?',
                               style: const TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.bold,
@@ -124,26 +113,10 @@ class _FollowersPageState extends State<FollowersPage> {
                                   color: textColor)),
                           if (jobTitle.isNotEmpty)
                             Text(jobTitle,
-                                style: TextStyle(
-                                    fontSize: 13, color: subColor)),
+                                style:
+                                    TextStyle(fontSize: 13, color: subColor)),
                         ],
                       ),
-                    ),
-                    TextButton(
-                      onPressed: () =>
-                          setState(() => _unfollowed.add(uid)),
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.redAccent,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                          side: const BorderSide(color: Colors.redAccent),
-                        ),
-                      ),
-                      child: const Text('Unfollow',
-                          style: TextStyle(
-                              fontSize: 13, fontWeight: FontWeight.w600)),
                     ),
                   ],
                 ),
