@@ -1162,85 +1162,108 @@ class _ProfilePageState extends State<ProfilePage> {
   // ─────────────────────────────────────────────────────────────────────────────
 
   Future<void> _pickImage(ImageSource source) async {
+    XFile? pickedFile;
     try {
-      final XFile? pickedFile = await _picker.pickImage(
+      pickedFile = await _picker.pickImage(
         source: source,
         maxWidth: 500,
         maxHeight: 500,
         imageQuality: 80,
       );
+    } catch (_) {
+      // Permission denied or picker error — just close the sheet
+      if (mounted) Navigator.pop(context);
+      return;
+    }
 
-      if (pickedFile != null) {
-        setState(() => _isUploadingImage = true);
-        Navigator.pop(context);
+    if (pickedFile == null) {
+      // User cancelled the picker
+      if (mounted) Navigator.pop(context);
+      return;
+    }
 
-        final cloudinaryService = CloudinaryService();
-        final imageUrl = await cloudinaryService
-            .uploadProfilePicture(File(pickedFile.path));
+    // Close the bottom sheet before uploading
+    if (mounted) Navigator.pop(context);
+    setState(() => _isUploadingImage = true);
 
-        if (imageUrl != null) {
-          final authService =
-              Provider.of<AuthService>(context, listen: false);
-          final uid = authService.currentUser?.uid;
+    try {
+      final cloudinaryService = CloudinaryService();
+      final imageUrl = await cloudinaryService
+          .uploadProfilePicture(File(pickedFile.path));
 
-          if (uid != null) {
-            await authService.firestore
-                .collection('users')
-                .doc(uid)
-                .update({'profilePicture': imageUrl});
-          }
+      if (!mounted) return;
 
-          setState(() {
-            _currentProfile = UserProfile(
-              id: _currentProfile.id,
-              name: _currentProfile.name,
-              jobTitle: _currentProfile.jobTitle,
-              company: _currentProfile.company,
-              location: _currentProfile.location,
-              bio: _currentProfile.bio,
-              profilePicture: imageUrl,
-              connections: _currentProfile.connections,
-              posts: _currentProfile.posts,
-              followers: _currentProfile.followers,
-              experience: _currentProfile.experience,
-              education: _currentProfile.education,
-              skills: _currentProfile.skills,
-              isOwnProfile: _currentProfile.isOwnProfile,
-            );
-            _isUploadingImage = false;
-          });
-
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Profile picture updated successfully!'),
-                backgroundColor: Colors.green,
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-          }
-        } else {
-          setState(() => _isUploadingImage = false);
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Failed to upload image. Please try again.'),
-                backgroundColor: Colors.red,
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-          }
+      if (imageUrl != null) {
+        final authService =
+            Provider.of<AuthService>(context, listen: false);
+        final uid = authService.currentUser?.uid;
+        if (uid != null) {
+          await authService.firestore
+              .collection('users')
+              .doc(uid)
+              .update({'profilePicture': imageUrl});
         }
+        if (!mounted) return;
+        setState(() {
+          _currentProfile = UserProfile(
+            id: _currentProfile.id,
+            name: _currentProfile.name,
+            jobTitle: _currentProfile.jobTitle,
+            company: _currentProfile.company,
+            location: _currentProfile.location,
+            bio: _currentProfile.bio,
+            profilePicture: imageUrl,
+            connections: _currentProfile.connections,
+            posts: _currentProfile.posts,
+            followers: _currentProfile.followers,
+            experience: _currentProfile.experience,
+            education: _currentProfile.education,
+            skills: _currentProfile.skills,
+            isOwnProfile: _currentProfile.isOwnProfile,
+          );
+          _isUploadingImage = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profile picture updated successfully!'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       } else {
-        Navigator.pop(context);
+        setState(() => _isUploadingImage = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to upload image. Please try again.'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() => _isUploadingImage = false);
-      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Upload error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
-  void _removeProfilePicture() {
+  Future<void> _removeProfilePicture() async {
+    Navigator.pop(context);
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final uid = authService.currentUser?.uid;
+    if (uid != null) {
+      await authService.firestore
+          .collection('users')
+          .doc(uid)
+          .update({'profilePicture': ''});
+    }
+    if (!mounted) return;
     setState(() {
       _currentProfile = UserProfile(
         id: _currentProfile.id,
@@ -1259,7 +1282,6 @@ class _ProfilePageState extends State<ProfilePage> {
         isOwnProfile: _currentProfile.isOwnProfile,
       );
     });
-    Navigator.pop(context);
   }
 
   // ─────────────────────────────────────────────────────────────────────────────

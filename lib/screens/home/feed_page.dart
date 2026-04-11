@@ -243,20 +243,22 @@ class _FeedPageState extends State<FeedPage> {
           ),
           const SizedBox(width: 10),
           GestureDetector(
-            onTap: () {
+            onTap: () async {
               if (_userProfile != null) {
-                Navigator.push(
+                await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) => ProfilePage(userProfile: _userProfile!),
                   ),
                 );
+                _loadProfile();
               }
             },
             child: _AvatarCircle(
               name: _userProfile?.name ?? 'U',
               size: 36,
               fontSize: 13,
+              photoUrl: _userProfile?.profilePicture,
             ),
           ),
         ],
@@ -669,7 +671,10 @@ class _PostCardState extends State<_PostCard> {
                   child: Row(
                     children: [
                       _AvatarCircle(
-                          name: post.author, size: 46, fontSize: 18),
+                          name: post.author,
+                          size: 46,
+                          fontSize: 18,
+                          photoUrl: post.authorProfilePicture),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
@@ -825,16 +830,19 @@ class _AvatarCircle extends StatelessWidget {
   final String name;
   final double size;
   final double fontSize;
+  final String? photoUrl;
 
   const _AvatarCircle({
     required this.name,
     required this.size,
     required this.fontSize,
+    this.photoUrl,
   });
 
   @override
   Widget build(BuildContext context) {
     final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+    final hasPhoto = photoUrl != null && photoUrl!.isNotEmpty;
     return Container(
       width: size,
       height: size,
@@ -846,15 +854,29 @@ class _AvatarCircle extends StatelessWidget {
           colors: [AppColors.wisteria, AppColors.splashPurple],
         ),
       ),
-      child: Center(
-        child: Text(
-          initial,
-          style: TextStyle(
-            color: AppColors.white,
-            fontSize: fontSize,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
+      child: ClipOval(
+        child: hasPhoto
+            ? Image.network(
+                photoUrl!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Center(
+                  child: Text(initial,
+                      style: TextStyle(
+                          color: AppColors.white,
+                          fontSize: fontSize,
+                          fontWeight: FontWeight.w700)),
+                ),
+              )
+            : Center(
+                child: Text(
+                  initial,
+                  style: TextStyle(
+                    color: AppColors.white,
+                    fontSize: fontSize,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
       ),
     );
   }
