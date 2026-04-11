@@ -9,6 +9,7 @@ import 'providers/theme_provider.dart';
 import 'providers/language_provider.dart';
 import 'screens/splash/splash_page.dart';
 import 'utils/app_colors.dart';
+import 'services/chat_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,6 +30,8 @@ class WiApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         // Controls EN / RU / TJ language selection
         ChangeNotifierProvider(create: (_) => LanguageProvider()),
+        // Chat service for managing conversations and messages
+        Provider<ChatService>(create: (_) => ChatService(),),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) {

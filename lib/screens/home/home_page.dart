@@ -25,7 +25,7 @@ class _HomePageState extends State<HomePage> {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   UserProfile? _userProfile;
 
-  static const _pages = [FeedPage(), MessagesPage()];
+  final _pages = [FeedPage(), MessagesPage()];
 
   @override
   void initState() {
