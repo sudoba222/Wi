@@ -11,12 +11,16 @@ class ChatScreen extends StatefulWidget {
   final String conversationId;
   final String otherUserName;
   final String otherUserId;
+  final bool isPinned;
+  final VoidCallback? onTogglePin;
 
   const ChatScreen({
     super.key,
     required this.conversationId,
     required this.otherUserName,
     required this.otherUserId,
+    this.isPinned = false,
+    this.onTogglePin,
   });
 
   @override
@@ -64,31 +68,48 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _showChatOptions() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final chatService = Provider.of<ChatService>(context, listen: false);
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  final chatService = Provider.of<ChatService>(context, listen: false);
 
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 32),
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.darkCard : AppColors.white,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Center(
-              child: Container(
-                width: 36, height: 4,
-                margin: const EdgeInsets.only(bottom: 8),
-                decoration: BoxDecoration(
-                  color: AppColors.mutedText.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(2),
-                ),
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: Colors.transparent,
+    builder: (_) => Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkCard : AppColors.white,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Center(
+            child: Container(
+              width: 36, height: 4,
+              margin: const EdgeInsets.only(bottom: 8),
+              decoration: BoxDecoration(
+                color: AppColors.mutedText.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(2),
               ),
+            ),
+          ),
+          ListTile(
+            leading: Icon(
+              widget.isPinned ? Icons.push_pin_outlined : Icons.push_pin_rounded,
+              color: AppColors.sunglow,
+            ),
+            title: Text(
+              widget.isPinned ? 'Unpin chat' : 'Pin chat',
+              style: TextStyle(
+                color: isDark ? Colors.white : AppColors.darkPurple,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+              onTap: () {
+                Navigator.pop(context);
+                widget.onTogglePin?.call();
+              },
             ),
             ListTile(
               leading: const Icon(Icons.delete_sweep_rounded, color: Colors.orange),
@@ -117,7 +138,6 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
     );
   }
-
   void _showMeetingScheduler() {
     DateTime selectedDate = DateTime.now().add(const Duration(days: 1));
     TimeOfDay selectedTime = const TimeOfDay(hour: 10, minute: 0);
@@ -404,11 +424,42 @@ class _ChatScreenState extends State<ChatScreen> {
                             color: isDark ? Colors.white : AppColors.darkPurple,
                             fontSize: 15,
                             fontWeight: FontWeight.w700)),
-                    const Text('Online',
-                        style: TextStyle(
-                            color: Color(0xFF2ECC71),
+                    StreamBuilder<Map<String, dynamic>>(
+                      stream: Provider.of<ChatService>(context, listen: false)
+                          .getUserPresenceStream(widget.otherUserId),
+                      builder: (context, snapshot) {
+                        final data = snapshot.data ?? {};
+                        final isOnline = data['online'] ?? false;
+                        final lastSeen = data['lastSeen'];
+
+                        String statusText = 'Offline';
+                        if (isOnline) {
+                          statusText = 'Online';
+                        } else if (lastSeen != null) {
+                          final lastSeenTime = (lastSeen as dynamic).toDate() as DateTime;
+                          final now = DateTime.now();
+                          final diff = now.difference(lastSeenTime);
+                          if (diff.inMinutes < 1) {
+                            statusText = 'Just now';
+                          } else if (diff.inMinutes < 60) {
+                            statusText = '${diff.inMinutes}m ago';
+                          } else if (diff.inHours < 24) {
+                            statusText = '${diff.inHours}h ago';
+                          } else {
+                            statusText = '${diff.inDays}d ago';
+                          }
+                        }
+
+                        return Text(
+                          statusText,
+                          style: TextStyle(
+                            color: isOnline ? const Color(0xFF2ECC71) : AppColors.mutedText,
                             fontSize: 12,
-                            fontWeight: FontWeight.w500)),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        );
+                      },
+                    ),
                   ],
                 ),
               ),

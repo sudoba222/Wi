@@ -118,6 +118,20 @@ class ChatService {
     });
   }
 
+  // check if the user is online or not
+  Stream<Map<String, dynamic>> getUserPresenceStream(String userId) {
+  return _firestore
+      .collection('users')
+      .doc(userId)
+      .snapshots()
+      .map((doc) {
+    final data = doc.data() ?? {};
+    return {
+      'online': data['online'] ?? false,
+      'lastSeen': data['lastSeen'],
+    };
+  });
+}
   // Send a meeting invite
   Future<void> sendMeetingInvite(
     String conversationId,
@@ -166,6 +180,29 @@ class ChatService {
         .update({'meeting.status': status});
   }
 
+// Toggle pin/unpin conversation
+  Future<void> togglePin(String conversationId, bool isPinned) async {
+  await _firestore
+      .collection('users')
+      .doc(currentUserId)
+      .update({
+    'pinnedConversations': isPinned
+        ? FieldValue.arrayUnion([conversationId])
+        : FieldValue.arrayRemove([conversationId]),
+  });
+  }
+
+Stream<Set<String>> getPinnedConversationsStream() {
+  return _firestore
+      .collection('users')
+      .doc(currentUserId)
+      .snapshots()
+      .map((doc) {
+    final data = doc.data() ?? {};
+    final pinned = List<String>.from(data['pinnedConversations'] ?? []);
+    return pinned.toSet();
+  });
+  }
   // Delete a conversation
   Future<void> deleteConversation(String conversationId) async {
     final messagesRef = _firestore

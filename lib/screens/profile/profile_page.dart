@@ -15,6 +15,8 @@ import '../../services/cloudinary_service.dart';
 import 'connections_page.dart';
 import 'followers_page.dart';
 import 'posts_page.dart';
+import '../../services/chat_service.dart';
+import '../chat/chat_screen.dart';
 
 class ProfilePage extends StatefulWidget {
   final UserProfile userProfile;
@@ -30,6 +32,8 @@ class _ProfilePageState extends State<ProfilePage> {
   late UserProfile _currentProfile;
   bool _isUploadingImage = false;
   final ImagePicker _picker = ImagePicker();
+  bool _isFollowing = false;
+  bool _followLoading = false;
 
   final ScrollController _scrollController = ScrollController();
   double _scrollOffset = 0.0;
@@ -52,6 +56,7 @@ class _ProfilePageState extends State<ProfilePage> {
       }
     });
     _loadConnectionStatus();
+    _loadFollowStatus();
   }
 
   Future<void> _loadConnectionStatus() async {
@@ -110,6 +115,49 @@ class _ProfilePageState extends State<ProfilePage> {
       if (mounted) setState(() => _connectionLoading = false);
     }
   }
+
+  Future<void> _loadFollowStatus() async {
+  if (_currentProfile.isOwnProfile) return;
+  final myUid = FirebaseAuth.instance.currentUser?.uid;
+  if (myUid == null) return;
+  final doc = await FirebaseFirestore.instance
+      .collection('users')
+      .doc(_currentProfile.id)
+      .collection('followers')
+      .doc(myUid)
+      .get();
+  if (mounted) setState(() => _isFollowing = doc.exists);
+}
+
+Future<void> _toggleFollow() async {
+  final myUid = FirebaseAuth.instance.currentUser?.uid;
+  if (myUid == null) return;
+  setState(() => _followLoading = true);
+  try {
+    final firestore = FirebaseFirestore.instance;
+    final followerRef = firestore
+        .collection('users')
+        .doc(_currentProfile.id)
+        .collection('followers')
+        .doc(myUid);
+
+    if (_isFollowing) {
+      await followerRef.delete();
+    } else {
+      final myDoc = await firestore.collection('users').doc(myUid).get();
+      final myData = myDoc.data() ?? {};
+      await followerRef.set({
+        'followedAt': FieldValue.serverTimestamp(),
+        'name': myData['fullName'] ?? '',
+        'jobTitle': myData['jobTitle'] ?? '',
+        'profilePicture': myData['profilePicture'] ?? '',
+      });
+    }
+    if (mounted) setState(() => _isFollowing = !_isFollowing);
+  } finally {
+    if (mounted) setState(() => _followLoading = false);
+  }
+}
 
   @override
   void dispose() {
@@ -528,6 +576,8 @@ class _ProfilePageState extends State<ProfilePage> {
   // HEADER CARD  (action buttons only)
   // ─────────────────────────────────────────────────────────────────────────────
 
+  // HEADER CARD  (action buttons only)
+  // ─────────────────────────────────────────────────────────────────────────────
   Widget _buildHeaderCard(UserProfile profile, Color cardColor, Color textColor,
       Color subTextColor) {
     return _card(
@@ -562,9 +612,59 @@ class _ProfilePageState extends State<ProfilePage> {
                     label: 'Message',
                     icon: Icons.send_outlined,
                     isPrimary: false,
-                    onTap: () {},
+                    onTap: () async {
+                      final chatService = Provider.of<ChatService>(context, listen: false);
+                      final convId = await chatService.getOrCreateConversation(_currentProfile.id);
+                      if (mounted) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ChatScreen(
+                              conversationId: convId,
+                              otherUserName: _currentProfile.name,
+                              otherUserId: _currentProfile.id,
+                            ),
+                          ),
+                        );
+                      }
+                    },
                   ),
                 ),
+                const SizedBox(width: 10),
+                _followLoading
+                    ? const SizedBox(
+                        width: 44,
+                        height: 44,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: AppColors.wisteria),
+                      )
+                    : GestureDetector(
+                        onTap: _toggleFollow,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: _isFollowing
+                                ? AppColors.wisteria
+                                : Colors.transparent,
+                            border: Border.all(
+                              color: AppColors.wisteria,
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Icon(
+                            _isFollowing
+                                ? Icons.person_remove_outlined
+                                : Icons.person_add_alt_1_outlined,
+                            color: _isFollowing
+                                ? Colors.white
+                                : AppColors.wisteria,
+                            size: 20,
+                          ),
+                        ),
+                      ),
               ],
             ),
     );

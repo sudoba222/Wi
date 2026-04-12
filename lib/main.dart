@@ -1,73 +1,83 @@
-// ignore_for_file: deprecated_member_use
-
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'services/auth_services.dart';
-import 'providers/theme_provider.dart';
-import 'providers/language_provider.dart';
-import 'screens/splash/splash_page.dart';
-import 'utils/app_colors.dart';
 import 'services/chat_service.dart';
+import 'providers/language_provider.dart';
+import 'providers/theme_provider.dart';
+import 'screens/splash/splash_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const WiApp());
 }
 
-class WiApp extends StatelessWidget {
+class WiApp extends StatefulWidget {
   const WiApp({Key? key}) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        // Firebase auth service — single source of truth for current user
-        Provider<AuthService>(create: (_) => AuthService()),
-        // Controls light / dark mode toggle from the drawer
-        ChangeNotifierProvider(create: (_) => ThemeProvider()),
-        // Controls EN / RU / TJ language selection
-        ChangeNotifierProvider(create: (_) => LanguageProvider()),
-        // Chat service for managing conversations and messages
-        Provider<ChatService>(create: (_) => ChatService(),),
-      ],
-      child: Consumer<ThemeProvider>(
-        builder: (context, themeProvider, _) {
-          return MaterialApp(
-            title: 'Wi Tajikistan',
-            debugShowCheckedModeBanner: false,
-            themeMode: themeProvider.isDark ? ThemeMode.dark : ThemeMode.light,
-            // Light theme
-            theme: ThemeData(
-              fontFamily: 'Roboto',
-              useMaterial3: true,
-              colorScheme: ColorScheme.fromSeed(
-                seedColor: AppColors.splashPurple,
-                brightness: Brightness.light,
-              ),
-              scaffoldBackgroundColor: AppColors.background,
-            ),
-            // Dark theme
-            darkTheme: ThemeData(
-              fontFamily: 'Roboto',
-              useMaterial3: true,
-              brightness: Brightness.dark,
-              colorScheme: ColorScheme.fromSeed(
-                seedColor: AppColors.splashPurple,
-                brightness: Brightness.dark,
-              ).copyWith(
-                surface: const Color(0xFF1A0A22),
-                onSurface: Colors.white,
-              ),
-              scaffoldBackgroundColor: const Color(0xFF1A0A22),
-              cardColor: const Color(0xFF2D1040),
-            ),
-            home: const SplashPage(),
-          );
-        },
-      ),
-    );
+  State<WiApp> createState() => _WiAppState();
+}
+
+class _WiAppState extends State<WiApp> with WidgetsBindingObserver {
+  late AuthService _authService;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _authService = AuthService();
   }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _authService.setUserOnline();
+    } else if (state == AppLifecycleState.paused ||
+               state == AppLifecycleState.detached) {
+      _authService.setUserOffline();
+    }
+  }
+
+  @override
+Widget build(BuildContext context) {
+  return MultiProvider(
+    providers: [
+      Provider<AuthService>(create: (_) => _authService),
+      Provider<ChatService>(create: (_) => ChatService()),
+      ChangeNotifierProvider(create: (_) => LanguageProvider()),
+      ChangeNotifierProvider(create: (_) => ThemeProvider()),
+    ],
+    child: Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        return MaterialApp(
+          title: 'Wi Tajikistan',
+          theme: ThemeData(
+            fontFamily: 'Roboto',
+            useMaterial3: true,
+            brightness: Brightness.light,
+          ),
+          darkTheme: ThemeData(
+            fontFamily: 'Roboto',
+            useMaterial3: true,
+            brightness: Brightness.dark,
+          ),
+          themeMode: themeProvider.isDark ? ThemeMode.dark : ThemeMode.light,
+          home: const SplashPage(),
+          debugShowCheckedModeBanner: false,
+        );
+      },
+    ),
+  );
+}
 }

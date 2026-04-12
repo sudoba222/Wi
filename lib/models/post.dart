@@ -7,6 +7,10 @@ class Post {
   final String authorProfilePicture;
   final String content;
   final DateTime timestamp;
+  final List<String> mediaUrls;
+  final String mediaType;
+  final String location;
+  final List<String> taggedUsers;
   List<String> likedBy;
   int likes;
   int comments;
@@ -18,18 +22,19 @@ class Post {
     this.authorProfilePicture = '',
     required this.content,
     required this.timestamp,
+    this.mediaUrls = const [],
+    this.mediaType = '',
+    this.location = '',
+    this.taggedUsers = const [],
     this.likedBy = const [],
     this.likes = 0,
     this.comments = 0,
   });
 
-  // Check if current user liked this post
   bool isLikedBy(String userId) => likedBy.contains(userId);
 
-  // Convert from Firestore document
   factory Post.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
-
     return Post(
       id: doc.id,
       authorId: data['authorId'] ?? '',
@@ -37,13 +42,16 @@ class Post {
       authorProfilePicture: data['authorProfilePicture'] ?? '',
       content: data['content'] ?? '',
       timestamp: (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      mediaUrls: List<String>.from(data['mediaUrls'] ?? []),
+      mediaType: data['mediaType'] ?? '',
+      location: data['location'] ?? '',
+      taggedUsers: List<String>.from(data['taggedUsers'] ?? []),
       likedBy: List<String>.from(data['likedBy'] ?? []),
       likes: data['likes'] ?? 0,
       comments: data['comments'] ?? 0,
     );
   }
 
-  // Convert to Firestore document
   Map<String, dynamic> toFirestore() {
     return {
       'authorId': authorId,
@@ -51,13 +59,16 @@ class Post {
       'authorProfilePicture': authorProfilePicture,
       'content': content,
       'timestamp': Timestamp.fromDate(timestamp),
+      'mediaUrls': mediaUrls,
+      'mediaType': mediaType,
+      'location': location,
+      'taggedUsers': taggedUsers,
       'likedBy': likedBy,
       'likes': likes,
       'comments': comments,
     };
   }
 
-  // Create a copy with updated fields
   Post copyWith({
     String? id,
     String? authorId,
@@ -65,6 +76,10 @@ class Post {
     String? authorProfilePicture,
     String? content,
     DateTime? timestamp,
+    List<String>? mediaUrls,
+    String? mediaType,
+    String? location,
+    List<String>? taggedUsers,
     List<String>? likedBy,
     int? likes,
     int? comments,
@@ -76,6 +91,10 @@ class Post {
       authorProfilePicture: authorProfilePicture ?? this.authorProfilePicture,
       content: content ?? this.content,
       timestamp: timestamp ?? this.timestamp,
+      mediaUrls: mediaUrls ?? this.mediaUrls,
+      mediaType: mediaType ?? this.mediaType,
+      location: location ?? this.location,
+      taggedUsers: taggedUsers ?? this.taggedUsers,
       likedBy: likedBy ?? this.likedBy,
       likes: likes ?? this.likes,
       comments: comments ?? this.comments,

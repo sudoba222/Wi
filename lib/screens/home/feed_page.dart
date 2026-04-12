@@ -13,6 +13,7 @@ import '../../providers/language_provider.dart';
 import '../profile/profile_page.dart';
 import 'home_page.dart';
 import 'job_page.dart';
+import '../../widgets/video_player_widget.dart';
 
 // ─── Mock post data ────────────────────────────────────────────────────────────
 
@@ -561,7 +562,23 @@ class _PostCardState extends State<_PostCard> {
       builder: (_) => CommentsDialog(post: widget.post),
     );
   }
-
+  Future<void> _openAuthorProfile(String authorId) async {
+  final auth = Provider.of<AuthService>(context, listen: false);
+  if (authorId == widget.currentUserId) return;
+  try {
+    final userProfile = await auth.getFullUserProfile(authorId);
+    if (userProfile != null && mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ProfilePage(userProfile: userProfile),
+        ),
+      );
+    }
+  } catch (e) {
+    print('Error opening profile: $e');
+  }
+  }
   void _showMenu() {
     final isDark = widget.isDark;
     showModalBottomSheet(
@@ -665,38 +682,45 @@ class _PostCardState extends State<_PostCard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header
-                Padding(
+                
+               // Header
+              Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 8, 0),
                   child: Row(
                     children: [
-                      _AvatarCircle(
-                          name: post.author,
-                          size: 46,
-                          fontSize: 18,
-                          photoUrl: post.authorProfilePicture),
+                      GestureDetector(
+                        onTap: () => _openAuthorProfile(post.authorId),
+                        child: _AvatarCircle(
+                            name: post.author,
+                            size: 46,
+                            fontSize: 18,
+                            photoUrl: post.authorProfilePicture),
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              post.author,
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                color: textColor,
+                        child: GestureDetector(
+                          onTap: () => _openAuthorProfile(post.authorId),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                post.author,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: textColor,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              _formatTime(post.timestamp),
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: AppColors.mutedText,
+                              const SizedBox(height: 2),
+                              Text(
+                                _formatTime(post.timestamp),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.mutedText,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                       if (_isOwn)
@@ -711,10 +735,100 @@ class _PostCardState extends State<_PostCard> {
                   ),
                 ),
                 // Content — expandable caption (Instagram/Telegram style)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-                  child: _ExpandableText(text: post.content, isDark: isDark),
-                ),
+                if (post.content.isNotEmpty)
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(16, 14, 16, post.mediaUrls.isEmpty ? 16 : 8),
+                    child: _ExpandableText(text: post.content, isDark: isDark),
+                  ),
+
+                // Location
+                if (post.location.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.location_on_rounded, size: 13, color: AppColors.wisteria),
+                        const SizedBox(width: 4),
+                        Text(post.location,
+                            style: const TextStyle(fontSize: 12, color: AppColors.wisteria)),
+                      ],
+                    ),
+                  ),
+
+                // Images
+                if (post.mediaUrls.isNotEmpty && post.mediaType == 'image')
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4, bottom: 12),
+                    child: post.mediaUrls.length == 1
+                        ? Image.network(
+                            post.mediaUrls.first,
+                            width: double.infinity,
+                            height: 220,
+                            fit: BoxFit.cover,
+                            loadingBuilder: (_, child, progress) => progress == null
+                                ? child
+                                : Container(
+                                    height: 220,
+                                    color: AppColors.wisteria.withOpacity(0.1),
+                                    child: const Center(
+                                      child: CircularProgressIndicator(
+                                          color: AppColors.wisteria, strokeWidth: 2),
+                                    ),
+                                  ),
+                            errorBuilder: (_, __, ___) => Container(
+                              height: 160,
+                              color: AppColors.wisteria.withOpacity(0.08),
+                              child: const Center(
+                                child: Icon(Icons.image_outlined,
+                                    color: AppColors.wisteria, size: 40),
+                              ),
+                            ),
+                          )
+                        : SizedBox(
+                            height: 200,
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              itemCount: post.mediaUrls.length,
+                              itemBuilder: (_, i) => Container(
+                                margin: const EdgeInsets.only(right: 8),
+                                width: 180,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(12),
+                                  image: DecorationImage(
+                                    image: NetworkImage(post.mediaUrls[i]),
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                  ),
+
+                // Video
+                // Video
+                if (post.mediaUrls.isNotEmpty && post.mediaType == 'video')
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                    child: VideoPlayerWidget(videoUrl: post.mediaUrls.first),
+                  ),
+
+                // Tagged users
+                if (post.taggedUsers.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.person_rounded, size: 13, color: AppColors.mutedText),
+                        const SizedBox(width: 4),
+                        Text(
+                          'with ${post.taggedUsers.length} ${post.taggedUsers.length == 1 ? 'person' : 'people'}',
+                          style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
+                        ),
+                      ],
+                    ),
+                  ),
+
                 // Separator
                 Container(
                   height: 1,

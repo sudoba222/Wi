@@ -136,13 +136,28 @@ class AuthService {
           skills: List<String>.from(data['skills'] ?? []),
           experience: experienceList,
           education: educationList,
-          isOwnProfile: true,
+          isOwnProfile: uid == currentUser?.uid,
         );
       }
       return null;
     } catch (e) {
       return null;
     }
+  }
+  Future<void> setUserOnline() async {
+  if (currentUser == null) return;
+  await firestore.collection('users').doc(currentUser!.uid).update({
+    'online': true,
+    'lastSeen': FieldValue.serverTimestamp(),
+  });
+  }
+
+  Future<void> setUserOffline() async {
+  if (currentUser == null) return;
+  await firestore.collection('users').doc(currentUser!.uid).update({
+    'online': false,
+    'lastSeen': FieldValue.serverTimestamp(),
+  });
   }
 
   Future<void> signOut() async {

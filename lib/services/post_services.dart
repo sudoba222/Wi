@@ -23,33 +23,42 @@ class PostService {
   }
 
   // Create a new post
-  Future<bool> createPost({required String content}) async {
-    try {
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) return false;
+  Future<bool> createPost({
+  required String content,
+  List<String> mediaUrls = const [],
+  String mediaType = '',
+  String location = '',
+  List<String> taggedUsers = const [],
+}  ) async {
+  try {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) return false;
 
-      final authService = AuthService();
-      final userProfile = await authService.getFullUserProfile(currentUser.uid);
-      if (userProfile == null) return false;
+    final authService = AuthService();
+    final userProfile = await authService.getFullUserProfile(currentUser.uid);
+    if (userProfile == null) return false;
 
-      final postRef = _firestore.collection('posts').doc();
-      final post = Post(
-        id: postRef.id,
-        authorId: currentUser.uid,
-        author: userProfile.name,
-        authorProfilePicture: userProfile.profilePicture,
-        content: content,
-        timestamp: DateTime.now(),
-      );
+    final postRef = _firestore.collection('posts').doc();
+    final post = Post(
+      id: postRef.id,
+      authorId: currentUser.uid,
+      author: userProfile.name,
+      authorProfilePicture: userProfile.profilePicture,
+      content: content,
+      timestamp: DateTime.now(),
+      mediaUrls: mediaUrls,
+      mediaType: mediaType,
+      location: location,
+      taggedUsers: taggedUsers,
+    );
 
-      await postRef.set(post.toFirestore());
-      return true;
-    } catch (e) {
-      print('Error creating post: $e');
-      return false;
-    }
+    await postRef.set(post.toFirestore());
+    return true;
+  } catch (e) {
+    print('Error creating post: $e');
+    return false;
   }
-
+  }
   // Toggle like on a post
   Future<bool> toggleLike(String postId) async {
     try {
