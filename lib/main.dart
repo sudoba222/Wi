@@ -50,23 +50,34 @@ class _WiAppState extends State<WiApp> with WidgetsBindingObserver {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        Provider<AuthService>(create: (_) => _authService),
-        Provider<ChatService>(create: (_) => ChatService()),
-        ChangeNotifierProvider(create: (_) => LanguageProvider()),
-        ChangeNotifierProvider(create: (_) => ThemeProvider()),
-      ],
-      child: MaterialApp(
-        title: 'Wi Tajikistan',
-        theme: ThemeData(
-          fontFamily: 'Roboto',
-          useMaterial3: true,
-        ),
-        home: const SplashPage(),
-        debugShowCheckedModeBanner: false,
-      ),
-    );
-  }
+Widget build(BuildContext context) {
+  return MultiProvider(
+    providers: [
+      Provider<AuthService>(create: (_) => _authService),
+      Provider<ChatService>(create: (_) => ChatService()),
+      ChangeNotifierProvider(create: (_) => LanguageProvider()),
+      ChangeNotifierProvider(create: (_) => ThemeProvider()),
+    ],
+    child: Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        return MaterialApp(
+          title: 'Wi Tajikistan',
+          theme: ThemeData(
+            fontFamily: 'Roboto',
+            useMaterial3: true,
+            brightness: Brightness.light,
+          ),
+          darkTheme: ThemeData(
+            fontFamily: 'Roboto',
+            useMaterial3: true,
+            brightness: Brightness.dark,
+          ),
+          themeMode: themeProvider.isDark ? ThemeMode.dark : ThemeMode.light,
+          home: const SplashPage(),
+          debugShowCheckedModeBanner: false,
+        );
+      },
+    ),
+  );
+}
 }
