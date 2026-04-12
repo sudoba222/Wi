@@ -562,7 +562,23 @@ class _PostCardState extends State<_PostCard> {
       builder: (_) => CommentsDialog(post: widget.post),
     );
   }
-
+  Future<void> _openAuthorProfile(String authorId) async {
+  final auth = Provider.of<AuthService>(context, listen: false);
+  if (authorId == widget.currentUserId) return;
+  try {
+    final userProfile = await auth.getFullUserProfile(authorId);
+    if (userProfile != null && mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ProfilePage(userProfile: userProfile),
+        ),
+      );
+    }
+  } catch (e) {
+    print('Error opening profile: $e');
+  }
+  }
   void _showMenu() {
     final isDark = widget.isDark;
     showModalBottomSheet(
@@ -666,38 +682,45 @@ class _PostCardState extends State<_PostCard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header
-                Padding(
+                
+               // Header
+              Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 8, 0),
                   child: Row(
                     children: [
-                      _AvatarCircle(
-                          name: post.author,
-                          size: 46,
-                          fontSize: 18,
-                          photoUrl: post.authorProfilePicture),
+                      GestureDetector(
+                        onTap: () => _openAuthorProfile(post.authorId),
+                        child: _AvatarCircle(
+                            name: post.author,
+                            size: 46,
+                            fontSize: 18,
+                            photoUrl: post.authorProfilePicture),
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              post.author,
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                color: textColor,
+                        child: GestureDetector(
+                          onTap: () => _openAuthorProfile(post.authorId),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                post.author,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: textColor,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              _formatTime(post.timestamp),
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: AppColors.mutedText,
+                              const SizedBox(height: 2),
+                              Text(
+                                _formatTime(post.timestamp),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.mutedText,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                       if (_isOwn)

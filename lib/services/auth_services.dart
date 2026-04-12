@@ -136,7 +136,7 @@ class AuthService {
           skills: List<String>.from(data['skills'] ?? []),
           experience: experienceList,
           education: educationList,
-          isOwnProfile: true,
+          isOwnProfile: uid == currentUser?.uid,
         );
       }
       return null;
