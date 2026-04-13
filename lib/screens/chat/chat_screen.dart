@@ -38,6 +38,12 @@ class _ChatScreenState extends State<ChatScreen> {
     _controller.addListener(() {
       setState(() => _hasText = _controller.text.trim().isNotEmpty);
     });
+    // Mark messages as read when chat opens
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    final chatService = Provider.of<ChatService>(context, listen: false);
+    chatService.markMessagesAsRead(widget.conversationId);
+  });
+  
   }
 
   @override
@@ -427,11 +433,17 @@ class _ChatScreenState extends State<ChatScreen> {
                     StreamBuilder<Map<String, dynamic>>(
                       stream: Provider.of<ChatService>(context, listen: false)
                           .getUserPresenceStream(widget.otherUserId),
-                      builder: (context, snapshot) {
+                     builder: (context, snapshot) {
                         final data = snapshot.data ?? {};
-                        final isOnline = data['online'] ?? false;
+                        final isOnlineRaw = data['online'] ?? false;
                         final lastSeen = data['lastSeen'];
-
+                        // TTL check — if lastSeen > 2 minutes ago, treat as offline
+                        bool isOnline = false;
+                        if (isOnlineRaw && lastSeen != null) {
+                          final lastSeenTime = (lastSeen as dynamic).toDate() as DateTime;
+                          final diff = DateTime.now().difference(lastSeenTime);
+                          isOnline = diff.inMinutes < 2;
+                        }
                         String statusText = 'Offline';
                         if (isOnline) {
                           statusText = 'Online';
@@ -449,7 +461,6 @@ class _ChatScreenState extends State<ChatScreen> {
                             statusText = '${diff.inDays}d ago';
                           }
                         }
-
                         return Text(
                           statusText,
                           style: TextStyle(
@@ -687,8 +698,15 @@ class _MessageBubble extends StatelessWidget {
                           fontSize: 11, color: AppColors.mutedText)),
                   if (isSent) ...[
                     const SizedBox(width: 4),
-                    const Icon(Icons.done_all_rounded,
-                        size: 14, color: AppColors.wisteria),
+                    Icon(
+                      message.readBy.length > 1
+                          ? Icons.done_all_rounded
+                          : Icons.done_rounded,
+                      size: 14,
+                      color: message.readBy.length > 1
+                          ? AppColors.sunglow
+                          : AppColors.mutedText,
+                    ),
                   ],
                 ],
               ),
@@ -890,8 +908,15 @@ class _MeetingCard extends StatelessWidget {
                               fontSize: 11, color: AppColors.mutedText)),
                       if (isSent) ...[
                         const SizedBox(width: 4),
-                        const Icon(Icons.done_all_rounded,
-                            size: 14, color: AppColors.wisteria),
+                        Icon(
+                          message.readBy.length > 1
+                              ? Icons.done_all_rounded
+                              : Icons.done_rounded,
+                          size: 14,
+                          color: message.readBy.length > 1
+                              ? AppColors.sunglow
+                              : AppColors.mutedText,
+                        ),
                       ],
                     ],
                   ),

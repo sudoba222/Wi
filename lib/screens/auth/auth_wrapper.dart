@@ -21,12 +21,13 @@ class AuthWrapper extends StatelessWidget {
           );
         }
 
-        if (snapshot.hasData && snapshot.data != null) {
+       if (snapshot.hasData && snapshot.data != null) {
           // Set user online when they log in
           authService.setUserOnline();
           return const HomePage();
         }
-
+        // Set user offline when they log out
+        authService.setUserOffline();
         return const LoginPage();
       },
     );
