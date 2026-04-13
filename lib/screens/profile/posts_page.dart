@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../utils/app_colors.dart';
 import '../../models/user_profile.dart';
 import '../../models/post.dart';
+import '../../widgets/video_player_widget.dart';
 
 class PostsPage extends StatelessWidget {
   final UserProfile profile;
@@ -308,9 +309,63 @@ class _PostCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           // Content
-          Text(post.content,
-              style:
-                  TextStyle(fontSize: 14, color: textColor, height: 1.55)),
+          if (post.content.isNotEmpty)
+            Text(post.content,
+                style: TextStyle(fontSize: 14, color: textColor, height: 1.55)),
+          // Images
+          if (post.mediaUrls.isNotEmpty && post.mediaType == 'image') ...[
+            const SizedBox(height: 10),
+            post.mediaUrls.length == 1
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.network(
+                      post.mediaUrls.first,
+                      width: double.infinity,
+                      height: 200,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (_, child, progress) => progress == null
+                          ? child
+                          : Container(
+                              height: 200,
+                              color: AppColors.wisteria.withOpacity(0.1),
+                              child: const Center(
+                                child: CircularProgressIndicator(color: AppColors.wisteria, strokeWidth: 2),
+                              ),
+                            ),
+                      errorBuilder: (_, __, ___) => Container(
+                        height: 160,
+                        decoration: BoxDecoration(
+                          color: AppColors.wisteria.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Center(child: Icon(Icons.image_outlined, color: AppColors.wisteria, size: 36)),
+                      ),
+                    ),
+                  )
+                : SizedBox(
+                    height: 180,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: post.mediaUrls.length,
+                      itemBuilder: (_, i) => Container(
+                        margin: const EdgeInsets.only(right: 8),
+                        width: 160,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          image: DecorationImage(
+                            image: NetworkImage(post.mediaUrls[i]),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+          ],
+          // Video
+          if (post.mediaUrls.isNotEmpty && post.mediaType == 'video') ...[
+            const SizedBox(height: 10),
+            VideoPlayerWidget(videoUrl: post.mediaUrls.first),
+          ],
           const SizedBox(height: 12),
           // Engagement row
           Row(

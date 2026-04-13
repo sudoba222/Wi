@@ -3,6 +3,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../utils/app_colors.dart';
 import '../../models/post.dart';
 import '../../models/user_profile.dart';
@@ -89,11 +90,19 @@ class FeedPage extends StatefulWidget {
 class _FeedPageState extends State<FeedPage> {
   final _postService = PostService();
   UserProfile? _userProfile;
+  String _searchQuery = '';
+  final _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _loadProfile();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadProfile() async {
@@ -102,6 +111,21 @@ class _FeedPageState extends State<FeedPage> {
       final p = await auth.getFullUserProfile(auth.currentUser!.uid);
       if (mounted) setState(() => _userProfile = p);
     }
+  }
+
+  List<_MockPost> _filterMock(List<_MockPost> posts) {
+    if (_searchQuery.isEmpty) return posts;
+    return posts.where((p) =>
+      p.author.toLowerCase().contains(_searchQuery) ||
+      p.role.toLowerCase().contains(_searchQuery) ||
+      p.content.toLowerCase().contains(_searchQuery)).toList();
+  }
+
+  List<Post> _filterFirestore(List<Post> posts) {
+    if (_searchQuery.isEmpty) return posts;
+    return posts.where((p) =>
+      p.author.toLowerCase().contains(_searchQuery) ||
+      p.content.toLowerCase().contains(_searchQuery)).toList();
   }
 
   @override
@@ -130,24 +154,36 @@ class _FeedPageState extends State<FeedPage> {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return _buildLoadingState();
                 }
-                final firestorePosts = snapshot.data ?? [];
+                final filteredMock = _filterMock(_mockPosts.toList());
+                final filteredFirestore = _filterFirestore(snapshot.data ?? []);
+                final totalCount = filteredMock.length + filteredFirestore.length;
+
+                if (totalCount == 0 && _searchQuery.isNotEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.search_off_rounded, size: 48, color: AppColors.mutedText.withOpacity(0.5)),
+                        const SizedBox(height: 12),
+                        Text('No results for "$_searchQuery"',
+                            style: const TextStyle(color: AppColors.mutedText, fontSize: 15)),
+                      ],
+                    ),
+                  );
+                }
+
                 return RefreshIndicator(
                   color: AppColors.wisteria,
                   backgroundColor: isDark ? AppColors.darkCard : AppColors.white,
                   onRefresh: () async => setState(() {}),
                   child: ListView.builder(
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-                    itemCount: _mockPosts.length + firestorePosts.length,
+                    itemCount: totalCount,
                     itemBuilder: (context, i) {
-                      // Mock posts appear at the top
-                      if (i < _mockPosts.length) {
-                        return _MockPostCard(
-                          data: _mockPosts[i],
-                          isDark: isDark,
-                        );
+                      if (i < filteredMock.length) {
+                        return _MockPostCard(data: filteredMock[i], isDark: isDark);
                       }
-                      // Real Firestore posts below
-                      final post = firestorePosts[i - _mockPosts.length];
+                      final post = filteredFirestore[i - filteredMock.length];
                       return _PostCard(
                         post: post,
                         currentUserId: currentUser?.uid ?? '',
@@ -213,21 +249,29 @@ class _FeedPageState extends State<FeedPage> {
                       width: 1,
                     ),
                   ),
-                  child: Row(
-                    children: [
-                      const SizedBox(width: 14),
-                      const Icon(Icons.search_rounded,
-                          color: AppColors.mutedText, size: 18),
-                      const SizedBox(width: 8),
-                      Text(
-                        Provider.of<LanguageProvider>(context).t('search'),
-                        style: const TextStyle(
-                          color: AppColors.mutedText,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                    ],
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (v) => setState(() => _searchQuery = v.toLowerCase().trim()),
+                    style: TextStyle(
+                      color: isDark ? Colors.white : AppColors.darkPurple,
+                      fontSize: 14,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: Provider.of<LanguageProvider>(context).t('search'),
+                      hintStyle: const TextStyle(color: AppColors.mutedText, fontSize: 14),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                      prefixIcon: const Icon(Icons.search_rounded, color: AppColors.mutedText, size: 18),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear_rounded, color: AppColors.mutedText, size: 16),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() => _searchQuery = '');
+                              },
+                            )
+                          : null,
+                    ),
                   ),
                 ),
               ),
@@ -548,9 +592,16 @@ class _PostCardState extends State<_PostCard> {
   bool get _isOwn => widget.post.authorId == widget.currentUserId;
 
   Future<void> _toggleLike() async {
-    if (_likeLoading) return;
+    if (_likeLoading || widget.currentUserId.isEmpty) return;
     setState(() => _likeLoading = true);
-    await widget.postService.toggleLike(widget.post.id);
+    try {
+      final ref = FirebaseFirestore.instance.collection('posts').doc(widget.post.id);
+      if (_isLiked) {
+        await ref.update({'likedBy': FieldValue.arrayRemove([widget.currentUserId])});
+      } else {
+        await ref.update({'likedBy': FieldValue.arrayUnion([widget.currentUserId])});
+      }
+    } catch (_) {}
     if (mounted) setState(() => _likeLoading = false);
   }
 
