@@ -95,21 +95,24 @@ class ChatService {
 
   // Send a text message
   Future<void> sendMessage(String conversationId, String text) async {
-    final messageRef = _firestore
-        .collection('conversations')
-        .doc(conversationId)
-        .collection('messages')
-        .doc();
+  final messageRef = _firestore
+      .collection('conversations')
+      .doc(conversationId)
+      .collection('messages')
+      .doc();
 
-    final now = Timestamp.now();
+  final now = Timestamp.now();
 
-    await messageRef.set({
-      'text': text,
-      'senderId': currentUserId,
-      'timestamp': now,
-      'type': 'text',
-      'meeting': null,
-    });
+  await messageRef.set({
+    'text': text,
+    'senderId': currentUserId,
+    'timestamp': now,
+    'type': 'text',
+    'meeting': null,
+    'readBy': [currentUserId], // sender has already read it
+  });
+
+  
 
     // Update last message in conversation
     await _firestore.collection('conversations').doc(conversationId).update({
@@ -152,6 +155,7 @@ class ChatService {
       'senderId': currentUserId,
       'timestamp': now,
       'type': 'meeting',
+      'readBy': [currentUserId],
       'meeting': {
         'title': title,
         'date': date,
@@ -159,7 +163,6 @@ class ChatService {
         'status': 'pending',
       },
     });
-
     await _firestore.collection('conversations').doc(conversationId).update({
       'lastMessage': 'Meeting invite: $title',
       'lastMessageTime': now,
@@ -202,6 +205,29 @@ Stream<Set<String>> getPinnedConversationsStream() {
     final pinned = List<String>.from(data['pinnedConversations'] ?? []);
     return pinned.toSet();
   });
+  }
+
+  // Mark all messages in conversation as read by current user
+Future<void> markMessagesAsRead(String conversationId) async {
+  final messagesRef = _firestore
+      .collection('conversations')
+      .doc(conversationId)
+      .collection('messages');
+
+  final unread = await messagesRef
+      .where('senderId', isNotEqualTo: currentUserId)
+      .get();
+
+  final batch = _firestore.batch();
+  for (final doc in unread.docs) {
+    final readBy = List<String>.from(doc.data()['readBy'] ?? []);
+    if (!readBy.contains(currentUserId)) {
+      batch.update(doc.reference, {
+        'readBy': FieldValue.arrayUnion([currentUserId]),
+      });
+    }
+  }
+  await batch.commit();
   }
   // Delete a conversation
   Future<void> deleteConversation(String conversationId) async {

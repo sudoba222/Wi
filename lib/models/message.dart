@@ -36,6 +36,7 @@ class Message {
   final String senderId;
   final DateTime timestamp;
   final MeetingData? meeting;
+  final List<String> readBy;
 
   Message({
     required this.id,
@@ -45,7 +46,10 @@ class Message {
     required this.senderId,
     required this.timestamp,
     this.meeting,
+    this.readBy = const [],
   });
+
+  bool isReadBy(String userId) => readBy.contains(userId);
 
   Map<String, dynamic> toMap() => {
     'text': text,
@@ -53,6 +57,7 @@ class Message {
     'timestamp': Timestamp.fromDate(timestamp),
     'type': meeting != null ? 'meeting' : 'text',
     'meeting': meeting?.toMap(),
+    'readBy': readBy,
   };
 
   factory Message.fromFirestore(DocumentSnapshot doc, String currentUserId) {
@@ -68,6 +73,7 @@ class Message {
       senderId: data['senderId'] ?? '',
       time: '$hour:$minute',
       timestamp: timestamp,
+      readBy: List<String>.from(data['readBy'] ?? []),
       meeting: data['meeting'] != null
           ? MeetingData.fromMap(data['meeting'] as Map<String, dynamic>)
           : null,
