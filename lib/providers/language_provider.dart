@@ -48,7 +48,6 @@ class LanguageProvider extends ChangeNotifier {
       'noNotifications': 'No notifications yet',
       'noNotificationsSub': 'When someone likes, comments\nor follows you, it will appear here.',
       // About
-      'about': 'About Wi',
       'aboutTagline': 'Work Interconnected',
       'ourMission': 'Our Mission',
       'missionText': 'Wi Tajikistan is a professional networking platform built to connect the talented workforce of Tajikistan with opportunities, peers, and employers — all in one place.',
@@ -102,7 +101,6 @@ class LanguageProvider extends ChangeNotifier {
       'noNotifications': 'Уведомлений пока нет',
       'noNotificationsSub': 'Когда кто-то лайкнет, прокомментирует\nили подпишется — это появится здесь.',
       // About
-      'about': 'О Wi',
       'aboutTagline': 'Работа. Связь. Рост.',
       'ourMission': 'Наша миссия',
       'missionText': 'Wi Таджикистан — профессиональная платформа для объединения специалистов Таджикистана с возможностями, коллегами и работодателями.',
@@ -156,7 +154,6 @@ class LanguageProvider extends ChangeNotifier {
       'noNotifications': 'Огоҳиномаҳо нест',
       'noNotificationsSub': 'Вақте касе лайк, шарҳ ё обуна кунад\nинҷо намоиш дода мешавад.',
       // About
-      'about': 'Дар бораи Wi',
       'aboutTagline': 'Кор. Иртибот. Рушд.',
       'ourMission': 'Рисолати мо',
       'missionText': 'Wi Тоҷикистон платформаи касбии барои пайваст кардани мутахассисони Тоҷикистон бо имкониятҳо, ҳамкасбон ва корфармоён мебошад.',
