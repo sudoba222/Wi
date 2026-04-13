@@ -9,8 +9,11 @@ import '../../providers/language_provider.dart';
 import '../../services/auth_services.dart';
 import '../../models/user_profile.dart';
 import '../profile/profile_page.dart';
+import '../settings/about_page.dart';
+import '../settings/help_support_page.dart';
 import 'feed_page.dart';
 import 'messages_page.dart';
+import 'notifications_page.dart';
 import 'post_page.dart';
 
 // HomePage — root scaffold that owns the drawer and bottom nav
@@ -190,8 +193,12 @@ class _AppDrawer extends StatelessWidget {
 
                   _Div(isDark: isDark),
 
-                  _Tile(icon: Icons.help_outline_rounded, label: lang.t('helpSupport'), textColor: text, onTap: () => Navigator.pop(context)),
-                  _Tile(icon: Icons.info_outline_rounded, label: lang.t('about'), textColor: text, onTap: () => Navigator.pop(context)),
+                  _Tile(icon: Icons.notifications_outlined, label: lang.t('notifications'), textColor: text,
+                    onTap: () async { Navigator.pop(context); await Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsPage())); }),
+                  _Tile(icon: Icons.help_outline_rounded, label: lang.t('helpSupport'), textColor: text,
+                    onTap: () async { Navigator.pop(context); await Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpSupportPage())); }),
+                  _Tile(icon: Icons.info_outline_rounded, label: lang.t('about'), textColor: text,
+                    onTap: () async { Navigator.pop(context); await Navigator.push(context, MaterialPageRoute(builder: (_) => const AboutPage())); }),
 
                   _Div(isDark: isDark),
 
