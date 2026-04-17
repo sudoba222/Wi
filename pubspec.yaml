@@ -69,12 +69,13 @@ flutter:
   assets:
     - assets/icon.jpg
     - assets/icon.png
+    - assets/splash.png
   fonts:
     - family: Quicksand
       fonts:
         - asset: assets/fonts/Quicksand-Bold.ttf
 
-flutter_icons:
+flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/icon.jpg"
+  image_path: "assets/icon.png"

@@ -1388,6 +1388,107 @@ Future<void> _toggleFollow() async {
   // EDIT DIALOGS  (untouched backend logic)
   // ─────────────────────────────────────────────────────────────────────────────
 
+  InputDecoration _fieldDeco(String label, IconData icon) => InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon, color: AppColors.wisteria, size: 20),
+        filled: true,
+        fillColor: AppColors.background,
+        labelStyle:
+            const TextStyle(color: AppColors.mutedText, fontSize: 14),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide:
+              BorderSide(color: AppColors.wisteria.withOpacity(0.3)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide:
+              BorderSide(color: AppColors.wisteria.withOpacity(0.3)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide:
+              const BorderSide(color: AppColors.wisteria, width: 2),
+        ),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      );
+
+  Widget _dialogHeader(String title, IconData icon) => Container(
+        color: AppColors.darkPurple,
+        padding:
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.sunglow.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: AppColors.sunglow, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              title,
+              style: const TextStyle(
+                color: AppColors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.3,
+              ),
+            ),
+          ],
+        ),
+      );
+
+  Widget _dialogActions({
+    required VoidCallback onCancel,
+    required VoidCallback onConfirm,
+    String confirmLabel = 'Save',
+    Color confirmColor = AppColors.sunglow,
+    Color confirmTextColor = AppColors.darkPurple,
+  }) =>
+      Padding(
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+        child: Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: onCancel,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.darkPurple,
+                  side: BorderSide(
+                      color: AppColors.wisteria.withOpacity(0.6)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: const Text('Cancel',
+                    style: TextStyle(fontWeight: FontWeight.w500)),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: onConfirm,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: confirmColor,
+                  foregroundColor: confirmTextColor,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: Text(confirmLabel,
+                    style:
+                        const TextStyle(fontWeight: FontWeight.w600)),
+              ),
+            ),
+          ],
+        ),
+      );
+
   void _editBasicInfo() {
     final nameController =
         TextEditingController(text: _currentProfile.name);
@@ -1400,90 +1501,82 @@ Future<void> _toggleFollow() async {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.white,
+      builder: (context) => Dialog(
         shape:
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Edit Basic Info',
-            style: TextStyle(color: AppColors.darkPurple)),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                      labelText: 'Full Name',
-                      border: OutlineInputBorder())),
-              const SizedBox(height: 16),
-              TextField(
-                  controller: jobTitleController,
-                  decoration: const InputDecoration(
-                      labelText: 'Job Title',
-                      border: OutlineInputBorder())),
-              const SizedBox(height: 16),
-              TextField(
-                  controller: companyController,
-                  decoration: const InputDecoration(
-                      labelText: 'Company',
-                      border: OutlineInputBorder())),
-              const SizedBox(height: 16),
-              TextField(
-                  controller: locationController,
-                  decoration: const InputDecoration(
-                      labelText: 'Location',
-                      border: OutlineInputBorder())),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel',
-                style: TextStyle(color: AppColors.darkPurple)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final authService =
-                  Provider.of<AuthService>(context, listen: false);
-              final uid = authService.currentUser?.uid;
-              if (uid != null) {
-                await authService.firestore
-                    .collection('users')
-                    .doc(uid)
-                    .update({
-                  'fullName': nameController.text,
-                  'jobTitle': jobTitleController.text,
-                  'company': companyController.text,
-                  'location': locationController.text,
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _dialogHeader('Edit Basic Info', Icons.person_outline),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+                child: Column(
+                  children: [
+                    TextField(
+                        controller: nameController,
+                        decoration: _fieldDeco(
+                            'Full Name', Icons.badge_outlined)),
+                    const SizedBox(height: 14),
+                    TextField(
+                        controller: jobTitleController,
+                        decoration: _fieldDeco(
+                            'Job Title', Icons.work_outline)),
+                    const SizedBox(height: 14),
+                    TextField(
+                        controller: companyController,
+                        decoration: _fieldDeco(
+                            'Company', Icons.business_outlined)),
+                    const SizedBox(height: 14),
+                    TextField(
+                        controller: locationController,
+                        decoration: _fieldDeco(
+                            'Location', Icons.location_on_outlined)),
+                  ],
+                ),
+              ),
+            ),
+            _dialogActions(
+              onCancel: () => Navigator.pop(context),
+              onConfirm: () async {
+                final authService =
+                    Provider.of<AuthService>(context, listen: false);
+                final uid = authService.currentUser?.uid;
+                if (uid != null) {
+                  await authService.firestore
+                      .collection('users')
+                      .doc(uid)
+                      .update({
+                    'fullName': nameController.text,
+                    'jobTitle': jobTitleController.text,
+                    'company': companyController.text,
+                    'location': locationController.text,
+                  });
+                }
+                setState(() {
+                  _currentProfile = UserProfile(
+                    id: _currentProfile.id,
+                    name: nameController.text,
+                    jobTitle: jobTitleController.text,
+                    company: companyController.text,
+                    location: locationController.text,
+                    bio: _currentProfile.bio,
+                    profilePicture: _currentProfile.profilePicture,
+                    connections: _currentProfile.connections,
+                    posts: _currentProfile.posts,
+                    followers: _currentProfile.followers,
+                    experience: _currentProfile.experience,
+                    education: _currentProfile.education,
+                    skills: _currentProfile.skills,
+                    isOwnProfile: _currentProfile.isOwnProfile,
+                  );
                 });
-              }
-              setState(() {
-                _currentProfile = UserProfile(
-                  id: _currentProfile.id,
-                  name: nameController.text,
-                  jobTitle: jobTitleController.text,
-                  company: companyController.text,
-                  location: locationController.text,
-                  bio: _currentProfile.bio,
-                  profilePicture: _currentProfile.profilePicture,
-                  connections: _currentProfile.connections,
-                  posts: _currentProfile.posts,
-                  followers: _currentProfile.followers,
-                  experience: _currentProfile.experience,
-                  education: _currentProfile.education,
-                  skills: _currentProfile.skills,
-                  isOwnProfile: _currentProfile.isOwnProfile,
-                );
-              });
-              Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.sunglow),
-            child: const Text('Save',
-                style: TextStyle(color: AppColors.darkPurple)),
-          ),
-        ],
+                Navigator.pop(context);
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1494,64 +1587,79 @@ Future<void> _toggleFollow() async {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.white,
+      builder: (context) => Dialog(
         shape:
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Edit About',
-            style: TextStyle(color: AppColors.darkPurple)),
-        content: TextField(
-          controller: bioController,
-          maxLines: 5,
-          decoration: const InputDecoration(
-            labelText: 'About yourself',
-            border: OutlineInputBorder(),
-            hintText: 'Tell people about yourself...',
-          ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _dialogHeader('Edit About', Icons.notes_outlined),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+              child: TextField(
+                controller: bioController,
+                maxLines: 5,
+                decoration: InputDecoration(
+                  hintText: 'Tell people about yourself...',
+                  hintStyle: const TextStyle(
+                      color: AppColors.mutedText, fontSize: 14),
+                  filled: true,
+                  fillColor: AppColors.background,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                        color: AppColors.wisteria.withOpacity(0.3)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                        color: AppColors.wisteria.withOpacity(0.3)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                        color: AppColors.wisteria, width: 2),
+                  ),
+                  contentPadding: const EdgeInsets.all(16),
+                ),
+              ),
+            ),
+            _dialogActions(
+              onCancel: () => Navigator.pop(context),
+              onConfirm: () async {
+                final authService =
+                    Provider.of<AuthService>(context, listen: false);
+                final uid = authService.currentUser?.uid;
+                if (uid != null) {
+                  await authService.firestore
+                      .collection('users')
+                      .doc(uid)
+                      .update({'bio': bioController.text});
+                }
+                setState(() {
+                  _currentProfile = UserProfile(
+                    id: _currentProfile.id,
+                    name: _currentProfile.name,
+                    jobTitle: _currentProfile.jobTitle,
+                    company: _currentProfile.company,
+                    location: _currentProfile.location,
+                    bio: bioController.text,
+                    profilePicture: _currentProfile.profilePicture,
+                    connections: _currentProfile.connections,
+                    posts: _currentProfile.posts,
+                    followers: _currentProfile.followers,
+                    experience: _currentProfile.experience,
+                    education: _currentProfile.education,
+                    skills: _currentProfile.skills,
+                    isOwnProfile: _currentProfile.isOwnProfile,
+                  );
+                });
+                Navigator.pop(context);
+              },
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel',
-                style: TextStyle(color: AppColors.darkPurple)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final authService =
-                  Provider.of<AuthService>(context, listen: false);
-              final uid = authService.currentUser?.uid;
-              if (uid != null) {
-                await authService.firestore
-                    .collection('users')
-                    .doc(uid)
-                    .update({'bio': bioController.text});
-              }
-              setState(() {
-                _currentProfile = UserProfile(
-                  id: _currentProfile.id,
-                  name: _currentProfile.name,
-                  jobTitle: _currentProfile.jobTitle,
-                  company: _currentProfile.company,
-                  location: _currentProfile.location,
-                  bio: bioController.text,
-                  profilePicture: _currentProfile.profilePicture,
-                  connections: _currentProfile.connections,
-                  posts: _currentProfile.posts,
-                  followers: _currentProfile.followers,
-                  experience: _currentProfile.experience,
-                  education: _currentProfile.education,
-                  skills: _currentProfile.skills,
-                  isOwnProfile: _currentProfile.isOwnProfile,
-                );
-              });
-              Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.sunglow),
-            child: const Text('Save',
-                style: TextStyle(color: AppColors.darkPurple)),
-          ),
-        ],
       ),
     );
   }
@@ -1577,89 +1685,200 @@ Future<void> _toggleFollow() async {
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: AppColors.white,
+        builder: (context, setDialogState) => Dialog(
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20)),
-          title: Text(isEditing ? 'Edit Experience' : 'Add Experience',
-              style: const TextStyle(color: AppColors.darkPurple)),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                    controller: positionController,
-                    decoration: const InputDecoration(
-                        labelText: 'Position',
-                        border: OutlineInputBorder())),
-                const SizedBox(height: 16),
-                TextField(
-                    controller: companyController,
-                    decoration: const InputDecoration(
-                        labelText: 'Company',
-                        border: OutlineInputBorder())),
-                const SizedBox(height: 16),
-                TextField(
-                    controller: locationController,
-                    decoration: const InputDecoration(
-                        labelText: 'Location',
-                        border: OutlineInputBorder())),
-                const SizedBox(height: 16),
-                TextField(
-                    controller: descriptionController,
-                    maxLines: 3,
-                    decoration: const InputDecoration(
-                        labelText: 'Description',
-                        border: OutlineInputBorder())),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Checkbox(
-                      value: isCurrent,
-                      onChanged: (value) {
-                        setDialogState(() {
-                          isCurrent = value ?? false;
-                          if (isCurrent) endDate = null;
-                        });
-                      },
-                    ),
-                    const Text('I currently work here'),
-                  ],
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _dialogHeader(
+                isEditing ? 'Edit Experience' : 'Add Experience',
+                Icons.work_outline,
+              ),
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+                  child: Column(
+                    children: [
+                      TextField(
+                          controller: positionController,
+                          decoration: _fieldDeco(
+                              'Position', Icons.badge_outlined)),
+                      const SizedBox(height: 14),
+                      TextField(
+                          controller: companyController,
+                          decoration: _fieldDeco(
+                              'Company', Icons.business_outlined)),
+                      const SizedBox(height: 14),
+                      TextField(
+                          controller: locationController,
+                          decoration: _fieldDeco(
+                              'Location', Icons.location_on_outlined)),
+                      const SizedBox(height: 14),
+                      TextField(
+                          controller: descriptionController,
+                          maxLines: 3,
+                          decoration: _fieldDeco(
+                              'Description', Icons.notes_outlined)),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Checkbox(
+                            value: isCurrent,
+                            activeColor: AppColors.wisteria,
+                            shape: RoundedRectangleBorder(
+                                borderRadius:
+                                    BorderRadius.circular(4)),
+                            onChanged: (value) {
+                              setDialogState(() {
+                                isCurrent = value ?? false;
+                                if (isCurrent) endDate = null;
+                              });
+                            },
+                          ),
+                          const Text('I currently work here',
+                              style: TextStyle(
+                                  color: AppColors.darkPurple,
+                                  fontSize: 14)),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel',
-                  style: TextStyle(color: AppColors.darkPurple)),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final newExperience = Experience(
-                  id: experience?.id ??
-                      DateTime.now()
-                          .millisecondsSinceEpoch
-                          .toString(),
-                  position: positionController.text,
-                  company: companyController.text,
-                  location: locationController.text,
-                  startDate: startDate,
-                  endDate: isCurrent ? null : endDate,
-                  isCurrent: isCurrent,
-                  description: descriptionController.text,
-                );
+              ),
+              _dialogActions(
+                onCancel: () => Navigator.pop(context),
+                confirmLabel: isEditing ? 'Save' : 'Add',
+                onConfirm: () async {
+                  final newExperience = Experience(
+                    id: experience?.id ??
+                        DateTime.now()
+                            .millisecondsSinceEpoch
+                            .toString(),
+                    position: positionController.text,
+                    company: companyController.text,
+                    location: locationController.text,
+                    startDate: startDate,
+                    endDate: isCurrent ? null : endDate,
+                    isCurrent: isCurrent,
+                    description: descriptionController.text,
+                  );
 
-                List<Experience> updated =
-                    List.from(_currentProfile.experience);
-                if (isEditing) {
-                  final index = updated
-                      .indexWhere((exp) => exp.id == experience!.id);
-                  if (index != -1) updated[index] = newExperience;
-                } else {
-                  updated.add(newExperience);
-                }
+                  List<Experience> updated =
+                      List.from(_currentProfile.experience);
+                  if (isEditing) {
+                    final index = updated
+                        .indexWhere((exp) => exp.id == experience!.id);
+                    if (index != -1) updated[index] = newExperience;
+                  } else {
+                    updated.add(newExperience);
+                  }
+
+                  final authService =
+                      Provider.of<AuthService>(context, listen: false);
+                  final uid = authService.currentUser?.uid;
+                  if (uid != null) {
+                    await authService.firestore
+                        .collection('users')
+                        .doc(uid)
+                        .update({
+                      'experience':
+                          updated.map((e) => e.toMap()).toList(),
+                    });
+                  }
+
+                  setState(() {
+                    _currentProfile = UserProfile(
+                      id: _currentProfile.id,
+                      name: _currentProfile.name,
+                      jobTitle: _currentProfile.jobTitle,
+                      company: _currentProfile.company,
+                      location: _currentProfile.location,
+                      bio: _currentProfile.bio,
+                      profilePicture: _currentProfile.profilePicture,
+                      connections: _currentProfile.connections,
+                      posts: _currentProfile.posts,
+                      followers: _currentProfile.followers,
+                      experience: updated,
+                      education: _currentProfile.education,
+                      skills: _currentProfile.skills,
+                      isOwnProfile: _currentProfile.isOwnProfile,
+                    );
+                  });
+                  Navigator.pop(context);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _deleteExperience(Experience experience) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              color: const Color(0xFFB00020),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.delete_outline,
+                        color: Colors.white, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Delete Experience',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.warning_amber_rounded,
+                      color: Color(0xFFB00020), size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Remove "${experience.position}"? This cannot be undone.',
+                      style: const TextStyle(
+                          color: AppColors.darkPurple, fontSize: 14),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            _dialogActions(
+              onCancel: () => Navigator.pop(context),
+              confirmLabel: 'Delete',
+              confirmColor: const Color(0xFFB00020),
+              confirmTextColor: Colors.white,
+              onConfirm: () async {
+                final updatedExperience = _currentProfile.experience
+                    .where((exp) => exp.id != experience.id)
+                    .toList();
 
                 final authService =
                     Provider.of<AuthService>(context, listen: false);
@@ -1669,8 +1888,9 @@ Future<void> _toggleFollow() async {
                       .collection('users')
                       .doc(uid)
                       .update({
-                    'experience':
-                        updated.map((e) => e.toMap()).toList(),
+                    'experience': updatedExperience
+                        .map((e) => e.toMap())
+                        .toList(),
                   });
                 }
 
@@ -1686,7 +1906,7 @@ Future<void> _toggleFollow() async {
                     connections: _currentProfile.connections,
                     posts: _currentProfile.posts,
                     followers: _currentProfile.followers,
-                    experience: updated,
+                    experience: updatedExperience,
                     education: _currentProfile.education,
                     skills: _currentProfile.skills,
                     isOwnProfile: _currentProfile.isOwnProfile,
@@ -1694,81 +1914,9 @@ Future<void> _toggleFollow() async {
                 });
                 Navigator.pop(context);
               },
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.sunglow),
-              child: Text(isEditing ? 'Save' : 'Add',
-                  style:
-                      const TextStyle(color: AppColors.darkPurple)),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  void _deleteExperience(Experience experience) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.white,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Delete Experience',
-            style: TextStyle(color: AppColors.darkPurple)),
-        content: Text(
-            'Are you sure you want to delete "${experience.position}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel',
-                style: TextStyle(color: AppColors.darkPurple)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final updatedExperience = _currentProfile.experience
-                  .where((exp) => exp.id != experience.id)
-                  .toList();
-
-              final authService =
-                  Provider.of<AuthService>(context, listen: false);
-              final uid = authService.currentUser?.uid;
-              if (uid != null) {
-                await authService.firestore
-                    .collection('users')
-                    .doc(uid)
-                    .update({
-                  'experience': updatedExperience
-                      .map((e) => e.toMap())
-                      .toList(),
-                });
-              }
-
-              setState(() {
-                _currentProfile = UserProfile(
-                  id: _currentProfile.id,
-                  name: _currentProfile.name,
-                  jobTitle: _currentProfile.jobTitle,
-                  company: _currentProfile.company,
-                  location: _currentProfile.location,
-                  bio: _currentProfile.bio,
-                  profilePicture: _currentProfile.profilePicture,
-                  connections: _currentProfile.connections,
-                  posts: _currentProfile.posts,
-                  followers: _currentProfile.followers,
-                  experience: updatedExperience,
-                  education: _currentProfile.education,
-                  skills: _currentProfile.skills,
-                  isOwnProfile: _currentProfile.isOwnProfile,
-                );
-              });
-              Navigator.pop(context);
-            },
-            style:
-                ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Delete',
-                style: TextStyle(color: Colors.white)),
-          ),
-        ],
       ),
     );
   }
@@ -1794,282 +1942,79 @@ Future<void> _toggleFollow() async {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.white,
+      builder: (context) => Dialog(
         shape:
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(isEditing ? 'Edit Education' : 'Add Education',
-            style: const TextStyle(color: AppColors.darkPurple)),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                  controller: institutionController,
-                  decoration: const InputDecoration(
-                      labelText: 'Institution',
-                      border: OutlineInputBorder())),
-              const SizedBox(height: 16),
-              TextField(
-                  controller: degreeController,
-                  decoration: const InputDecoration(
-                      labelText: 'Degree',
-                      border: OutlineInputBorder())),
-              const SizedBox(height: 16),
-              TextField(
-                  controller: fieldController,
-                  decoration: const InputDecoration(
-                      labelText: 'Field of Study',
-                      border: OutlineInputBorder())),
-              const SizedBox(height: 16),
-              TextField(
-                  controller: gradeController,
-                  decoration: const InputDecoration(
-                      labelText: 'Grade/GPA (optional)',
-                      border: OutlineInputBorder())),
-              const SizedBox(height: 16),
-              TextField(
-                  controller: descriptionController,
-                  maxLines: 2,
-                  decoration: const InputDecoration(
-                      labelText: 'Description (optional)',
-                      border: OutlineInputBorder())),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel',
-                style: TextStyle(color: AppColors.darkPurple)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final newEducation = Education(
-                id: education?.id ??
-                    DateTime.now()
-                        .millisecondsSinceEpoch
-                        .toString(),
-                institution: institutionController.text,
-                degree: degreeController.text,
-                fieldOfStudy: fieldController.text,
-                startDate: startDate,
-                endDate: endDate,
-                grade: gradeController.text,
-                description: descriptionController.text,
-              );
-
-              List<Education> updated =
-                  List.from(_currentProfile.education);
-              if (isEditing) {
-                final index = updated
-                    .indexWhere((edu) => edu.id == education!.id);
-                if (index != -1) updated[index] = newEducation;
-              } else {
-                updated.add(newEducation);
-              }
-
-              final authService =
-                  Provider.of<AuthService>(context, listen: false);
-              final uid = authService.currentUser?.uid;
-              if (uid != null) {
-                await authService.firestore
-                    .collection('users')
-                    .doc(uid)
-                    .update({
-                  'education':
-                      updated.map((e) => e.toMap()).toList(),
-                });
-              }
-
-              setState(() {
-                _currentProfile = UserProfile(
-                  id: _currentProfile.id,
-                  name: _currentProfile.name,
-                  jobTitle: _currentProfile.jobTitle,
-                  company: _currentProfile.company,
-                  location: _currentProfile.location,
-                  bio: _currentProfile.bio,
-                  profilePicture: _currentProfile.profilePicture,
-                  connections: _currentProfile.connections,
-                  posts: _currentProfile.posts,
-                  followers: _currentProfile.followers,
-                  experience: _currentProfile.experience,
-                  education: updated,
-                  skills: _currentProfile.skills,
-                  isOwnProfile: _currentProfile.isOwnProfile,
-                );
-              });
-              Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.sunglow),
-            child: Text(isEditing ? 'Save' : 'Add',
-                style:
-                    const TextStyle(color: AppColors.darkPurple)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _deleteEducation(Education education) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.white,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Delete Education',
-            style: TextStyle(color: AppColors.darkPurple)),
-        content: Text(
-            'Are you sure you want to delete "${education.institution}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel',
-                style: TextStyle(color: AppColors.darkPurple)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final updatedEducation = _currentProfile.education
-                  .where((edu) => edu.id != education.id)
-                  .toList();
-
-              final authService =
-                  Provider.of<AuthService>(context, listen: false);
-              final uid = authService.currentUser?.uid;
-              if (uid != null) {
-                await authService.firestore
-                    .collection('users')
-                    .doc(uid)
-                    .update({
-                  'education': updatedEducation
-                      .map((e) => e.toMap())
-                      .toList(),
-                });
-              }
-
-              setState(() {
-                _currentProfile = UserProfile(
-                  id: _currentProfile.id,
-                  name: _currentProfile.name,
-                  jobTitle: _currentProfile.jobTitle,
-                  company: _currentProfile.company,
-                  location: _currentProfile.location,
-                  bio: _currentProfile.bio,
-                  profilePicture: _currentProfile.profilePicture,
-                  connections: _currentProfile.connections,
-                  posts: _currentProfile.posts,
-                  followers: _currentProfile.followers,
-                  experience: _currentProfile.experience,
-                  education: updatedEducation,
-                  skills: _currentProfile.skills,
-                  isOwnProfile: _currentProfile.isOwnProfile,
-                );
-              });
-              Navigator.pop(context);
-            },
-            style:
-                ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Delete',
-                style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _editSkills() {
-    final skillController = TextEditingController();
-    List<String> currentSkills = List.from(_currentProfile.skills);
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: AppColors.white,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20)),
-          title: const Text('Edit Skills',
-              style: TextStyle(color: AppColors.darkPurple)),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _dialogHeader(
+              isEditing ? 'Edit Education' : 'Add Education',
+              Icons.school_outlined,
+            ),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+                child: Column(
                   children: [
-                    Expanded(
-                      child: TextField(
-                        controller: skillController,
-                        decoration: const InputDecoration(
-                            labelText: 'Add a skill',
-                            border: OutlineInputBorder()),
-                        onSubmitted: (value) {
-                          if (value.isNotEmpty &&
-                              !currentSkills.contains(value)) {
-                            setDialogState(() {
-                              currentSkills.add(value);
-                              skillController.clear();
-                            });
-                          }
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      onPressed: () {
-                        if (skillController.text.isNotEmpty &&
-                            !currentSkills
-                                .contains(skillController.text)) {
-                          setDialogState(() {
-                            currentSkills.add(skillController.text);
-                            skillController.clear();
-                          });
-                        }
-                      },
-                      icon: const Icon(Icons.add,
-                          color: AppColors.darkPurple),
-                    ),
+                    TextField(
+                        controller: institutionController,
+                        decoration: _fieldDeco(
+                            'Institution', Icons.account_balance_outlined)),
+                    const SizedBox(height: 14),
+                    TextField(
+                        controller: degreeController,
+                        decoration: _fieldDeco(
+                            'Degree', Icons.military_tech_outlined)),
+                    const SizedBox(height: 14),
+                    TextField(
+                        controller: fieldController,
+                        decoration: _fieldDeco(
+                            'Field of Study', Icons.menu_book_outlined)),
+                    const SizedBox(height: 14),
+                    TextField(
+                        controller: gradeController,
+                        decoration: _fieldDeco(
+                            'Grade / GPA (optional)', Icons.grade_outlined)),
+                    const SizedBox(height: 14),
+                    TextField(
+                        controller: descriptionController,
+                        maxLines: 2,
+                        decoration: _fieldDeco(
+                            'Description (optional)', Icons.notes_outlined)),
                   ],
                 ),
-                const SizedBox(height: 16),
-                if (currentSkills.isNotEmpty) ...[
-                  const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text('Your Skills:',
-                        style:
-                            TextStyle(fontWeight: FontWeight.bold)),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: currentSkills
-                        .map((skill) => Chip(
-                              label: Text(skill),
-                              backgroundColor:
-                                  AppColors.wisteria.withOpacity(0.2),
-                              deleteIcon:
-                                  const Icon(Icons.close, size: 18),
-                              onDeleted: () => setDialogState(
-                                  () => currentSkills.remove(skill)),
-                            ))
-                        .toList(),
-                  ),
-                ],
-              ],
+              ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel',
-                  style: TextStyle(color: AppColors.darkPurple)),
-            ),
-            ElevatedButton(
-              onPressed: () async {
+            _dialogActions(
+              onCancel: () => Navigator.pop(context),
+              confirmLabel: isEditing ? 'Save' : 'Add',
+              onConfirm: () async {
+                final newEducation = Education(
+                  id: education?.id ??
+                      DateTime.now()
+                          .millisecondsSinceEpoch
+                          .toString(),
+                  institution: institutionController.text,
+                  degree: degreeController.text,
+                  fieldOfStudy: fieldController.text,
+                  startDate: startDate,
+                  endDate: endDate,
+                  grade: gradeController.text,
+                  description: descriptionController.text,
+                );
+
+                List<Education> updated =
+                    List.from(_currentProfile.education);
+                if (isEditing) {
+                  final index = updated
+                      .indexWhere((edu) => edu.id == education!.id);
+                  if (index != -1) updated[index] = newEducation;
+                } else {
+                  updated.add(newEducation);
+                }
+
                 final authService =
                     Provider.of<AuthService>(context, listen: false);
                 final uid = authService.currentUser?.uid;
@@ -2077,8 +2022,12 @@ Future<void> _toggleFollow() async {
                   await authService.firestore
                       .collection('users')
                       .doc(uid)
-                      .update({'skills': currentSkills});
+                      .update({
+                    'education':
+                        updated.map((e) => e.toMap()).toList(),
+                  });
                 }
+
                 setState(() {
                   _currentProfile = UserProfile(
                     id: _currentProfile.id,
@@ -2092,19 +2041,265 @@ Future<void> _toggleFollow() async {
                     posts: _currentProfile.posts,
                     followers: _currentProfile.followers,
                     experience: _currentProfile.experience,
-                    education: _currentProfile.education,
-                    skills: currentSkills,
+                    education: updated,
+                    skills: _currentProfile.skills,
                     isOwnProfile: _currentProfile.isOwnProfile,
                   );
                 });
                 Navigator.pop(context);
               },
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.sunglow),
-              child: const Text('Save',
-                  style: TextStyle(color: AppColors.darkPurple)),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  void _deleteEducation(Education education) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              color: const Color(0xFFB00020),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.delete_outline,
+                        color: Colors.white, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Delete Education',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.warning_amber_rounded,
+                      color: Color(0xFFB00020), size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Remove "${education.institution}"? This cannot be undone.',
+                      style: const TextStyle(
+                          color: AppColors.darkPurple, fontSize: 14),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            _dialogActions(
+              onCancel: () => Navigator.pop(context),
+              confirmLabel: 'Delete',
+              confirmColor: const Color(0xFFB00020),
+              confirmTextColor: Colors.white,
+              onConfirm: () async {
+                final updatedEducation = _currentProfile.education
+                    .where((edu) => edu.id != education.id)
+                    .toList();
+
+                final authService =
+                    Provider.of<AuthService>(context, listen: false);
+                final uid = authService.currentUser?.uid;
+                if (uid != null) {
+                  await authService.firestore
+                      .collection('users')
+                      .doc(uid)
+                      .update({
+                    'education': updatedEducation
+                        .map((e) => e.toMap())
+                        .toList(),
+                  });
+                }
+
+                setState(() {
+                  _currentProfile = UserProfile(
+                    id: _currentProfile.id,
+                    name: _currentProfile.name,
+                    jobTitle: _currentProfile.jobTitle,
+                    company: _currentProfile.company,
+                    location: _currentProfile.location,
+                    bio: _currentProfile.bio,
+                    profilePicture: _currentProfile.profilePicture,
+                    connections: _currentProfile.connections,
+                    posts: _currentProfile.posts,
+                    followers: _currentProfile.followers,
+                    experience: _currentProfile.experience,
+                    education: updatedEducation,
+                    skills: _currentProfile.skills,
+                    isOwnProfile: _currentProfile.isOwnProfile,
+                  );
+                });
+                Navigator.pop(context);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _editSkills() {
+    final skillController = TextEditingController();
+    List<String> currentSkills = List.from(_currentProfile.skills);
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => Dialog(
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20)),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _dialogHeader('Edit Skills', Icons.psychology_outlined),
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: skillController,
+                              decoration: _fieldDeco(
+                                  'Add a skill', Icons.add_circle_outline),
+                              onSubmitted: (value) {
+                                if (value.isNotEmpty &&
+                                    !currentSkills.contains(value)) {
+                                  setDialogState(() {
+                                    currentSkills.add(value);
+                                    skillController.clear();
+                                  });
+                                }
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: AppColors.darkPurple,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: IconButton(
+                              onPressed: () {
+                                if (skillController.text.isNotEmpty &&
+                                    !currentSkills.contains(
+                                        skillController.text)) {
+                                  setDialogState(() {
+                                    currentSkills
+                                        .add(skillController.text);
+                                    skillController.clear();
+                                  });
+                                }
+                              },
+                              icon: const Icon(Icons.add,
+                                  color: AppColors.sunglow),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (currentSkills.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Your Skills',
+                          style: TextStyle(
+                            color: AppColors.darkPurple,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: currentSkills
+                              .map((skill) => Chip(
+                                    label: Text(skill,
+                                        style: const TextStyle(
+                                            color: AppColors.darkPurple,
+                                            fontSize: 13)),
+                                    backgroundColor:
+                                        AppColors.wisteria.withOpacity(0.2),
+                                    side: BorderSide(
+                                        color: AppColors.wisteria
+                                            .withOpacity(0.4)),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(20)),
+                                    deleteIcon: const Icon(Icons.close,
+                                        size: 16,
+                                        color: AppColors.darkPurple),
+                                    onDeleted: () => setDialogState(
+                                        () => currentSkills.remove(skill)),
+                                  ))
+                              .toList(),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              _dialogActions(
+                onCancel: () => Navigator.pop(context),
+                onConfirm: () async {
+                  final authService =
+                      Provider.of<AuthService>(context, listen: false);
+                  final uid = authService.currentUser?.uid;
+                  if (uid != null) {
+                    await authService.firestore
+                        .collection('users')
+                        .doc(uid)
+                        .update({'skills': currentSkills});
+                  }
+                  setState(() {
+                    _currentProfile = UserProfile(
+                      id: _currentProfile.id,
+                      name: _currentProfile.name,
+                      jobTitle: _currentProfile.jobTitle,
+                      company: _currentProfile.company,
+                      location: _currentProfile.location,
+                      bio: _currentProfile.bio,
+                      profilePicture: _currentProfile.profilePicture,
+                      connections: _currentProfile.connections,
+                      posts: _currentProfile.posts,
+                      followers: _currentProfile.followers,
+                      experience: _currentProfile.experience,
+                      education: _currentProfile.education,
+                      skills: currentSkills,
+                      isOwnProfile: _currentProfile.isOwnProfile,
+                    );
+                  });
+                  Navigator.pop(context);
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
