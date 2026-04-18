@@ -1,5 +1,6 @@
 // ignore_for_file: deprecated_member_use
 
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -35,20 +36,69 @@ class _ChatScreenState extends State<ChatScreen> {
   int _prevMessageCount = 0;
   Message? _replyingTo;
 
+  // Scroll-to-bottom button
+  bool _showScrollDown = false;
+  int _unreadWhileScrolled = 0;
+
+  // Typing indicator
+  Timer? _typingTimer;
+  bool _wasTyping = false;
+
   @override
   void initState() {
     super.initState();
-    _controller.addListener(() {
-      _hasText.value = _controller.text.trim().isNotEmpty;
-    });
+    _controller.addListener(_onTextChanged);
+    _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final chatService = Provider.of<ChatService>(context, listen: false);
       chatService.markMessagesAsRead(widget.conversationId);
     });
   }
 
+  void _onTextChanged() {
+    _hasText.value = _controller.text.trim().isNotEmpty;
+    _handleTyping(_controller.text.trim().isNotEmpty);
+  }
+
+  void _handleTyping(bool isTyping) {
+    final chatService = Provider.of<ChatService>(context, listen: false);
+    if (isTyping && !_wasTyping) {
+      _wasTyping = true;
+      chatService.setTyping(widget.conversationId, true);
+    }
+    _typingTimer?.cancel();
+    if (isTyping) {
+      _typingTimer = Timer(const Duration(seconds: 3), () {
+        _wasTyping = false;
+        chatService.setTyping(widget.conversationId, false);
+      });
+    } else if (_wasTyping) {
+      _wasTyping = false;
+      chatService.setTyping(widget.conversationId, false);
+    }
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final atBottom = _scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 80;
+    if (atBottom && _showScrollDown) {
+      setState(() {
+        _showScrollDown = false;
+        _unreadWhileScrolled = 0;
+      });
+    } else if (!atBottom && !_showScrollDown) {
+      setState(() => _showScrollDown = true);
+    }
+  }
+
   @override
   void dispose() {
+    _typingTimer?.cancel();
+    final chatService = Provider.of<ChatService>(context, listen: false);
+    chatService.setTyping(widget.conversationId, false);
+    _controller.removeListener(_onTextChanged);
+    _scrollController.removeListener(_onScroll);
     _controller.dispose();
     _scrollController.dispose();
     _hasText.dispose();
@@ -342,7 +392,9 @@ class _ChatScreenState extends State<ChatScreen> {
           children: [
             _buildAppBar(context, name, initial, isDark),
             Expanded(
-              child: StreamBuilder<List<Message>>(
+              child: Stack(
+                children: [
+                  StreamBuilder<List<Message>>(
                 stream: chatService.getMessagesStream(widget.conversationId),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
@@ -358,9 +410,19 @@ class _ChatScreenState extends State<ChatScreen> {
                   }
 
                   if (messages.length > _prevMessageCount) {
+                    final newCount = messages.length - _prevMessageCount;
                     _prevMessageCount = messages.length;
-                    WidgetsBinding.instance
-                        .addPostFrameCallback((_) => _scrollToBottom());
+                    if (_showScrollDown) {
+                      // User is scrolled up — increment badge but don't scroll
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (mounted) {
+                          setState(() => _unreadWhileScrolled += newCount);
+                        }
+                      });
+                    } else {
+                      WidgetsBinding.instance
+                          .addPostFrameCallback((_) => _scrollToBottom());
+                    }
                   }
 
                   return ListView.builder(
@@ -393,6 +455,72 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   );
                 },
+              ),
+                  // Scroll-to-bottom floating button
+                  if (_showScrollDown)
+                    Positioned(
+                      bottom: 12,
+                      right: 16,
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _showScrollDown = false;
+                            _unreadWhileScrolled = 0;
+                          });
+                          _scrollToBottom();
+                        },
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Container(
+                              width: 42, height: 42,
+                              decoration: BoxDecoration(
+                                color: isDark
+                                    ? AppColors.darkCard
+                                    : AppColors.white,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                    color: AppColors.wisteria
+                                        .withOpacity(0.35)),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.darkPurple
+                                        .withOpacity(0.15),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                  Icons.keyboard_arrow_down_rounded,
+                                  color: AppColors.wisteria, size: 24),
+                            ),
+                            if (_unreadWhileScrolled > 0)
+                              Positioned(
+                                top: -4, right: -4,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 5, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.wisteria,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    _unreadWhileScrolled > 99
+                                        ? '99+'
+                                        : '$_unreadWhileScrolled',
+                                    style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
             _buildInputBar(isDark),
@@ -459,44 +587,76 @@ class _ChatScreenState extends State<ChatScreen> {
                             color: isDark ? Colors.white : AppColors.darkPurple,
                             fontSize: 15,
                             fontWeight: FontWeight.w700)),
-                    StreamBuilder<Map<String, dynamic>>(
-                      stream: Provider.of<ChatService>(context, listen: false)
-                          .getUserPresenceStream(widget.otherUserId),
-                     builder: (context, snapshot) {
-                        final data = snapshot.data ?? {};
-                        final isOnlineRaw = data['online'] ?? false;
-                        final lastSeen = data['lastSeen'];
-                        // TTL check — if lastSeen > 2 minutes ago, treat as offline
-                        bool isOnline = false;
-                        if (isOnlineRaw && lastSeen != null) {
-                          final lastSeenTime = (lastSeen as dynamic).toDate() as DateTime;
-                          final diff = DateTime.now().difference(lastSeenTime);
-                          isOnline = diff.inMinutes < 2;
+                    StreamBuilder<bool>(
+                      stream: Provider.of<ChatService>(context,
+                              listen: false)
+                          .getTypingStream(
+                              widget.conversationId,
+                              widget.otherUserId),
+                      builder: (context, typingSnap) {
+                        final isTyping = typingSnap.data ?? false;
+                        if (isTyping) {
+                          return Row(
+                            children: [
+                              _TypingDots(),
+                              const SizedBox(width: 5),
+                              const Text(
+                                'typing…',
+                                style: TextStyle(
+                                  color: AppColors.wisteria,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          );
                         }
-                        String statusText = 'Offline';
-                        if (isOnline) {
-                          statusText = 'Online';
-                        } else if (lastSeen != null) {
-                          final lastSeenTime = (lastSeen as dynamic).toDate() as DateTime;
-                          final now = DateTime.now();
-                          final diff = now.difference(lastSeenTime);
-                          if (diff.inMinutes < 1) {
-                            statusText = 'Just now';
-                          } else if (diff.inMinutes < 60) {
-                            statusText = '${diff.inMinutes}m ago';
-                          } else if (diff.inHours < 24) {
-                            statusText = '${diff.inHours}h ago';
-                          } else {
-                            statusText = '${diff.inDays}d ago';
-                          }
-                        }
-                        return Text(
-                          statusText,
-                          style: TextStyle(
-                            color: isOnline ? const Color(0xFF2ECC71) : AppColors.mutedText,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
+                        return StreamBuilder<Map<String, dynamic>>(
+                          stream: Provider.of<ChatService>(context,
+                                  listen: false)
+                              .getUserPresenceStream(widget.otherUserId),
+                          builder: (context, snapshot) {
+                            final data = snapshot.data ?? {};
+                            final isOnlineRaw = data['online'] ?? false;
+                            final lastSeen = data['lastSeen'];
+                            bool isOnline = false;
+                            if (isOnlineRaw && lastSeen != null) {
+                              final lastSeenTime =
+                                  (lastSeen as dynamic).toDate() as DateTime;
+                              isOnline = DateTime.now()
+                                      .difference(lastSeenTime)
+                                      .inMinutes <
+                                  2;
+                            }
+                            String statusText = 'Offline';
+                            if (isOnline) {
+                              statusText = 'Online';
+                            } else if (lastSeen != null) {
+                              final lastSeenTime =
+                                  (lastSeen as dynamic).toDate() as DateTime;
+                              final diff =
+                                  DateTime.now().difference(lastSeenTime);
+                              if (diff.inMinutes < 1) {
+                                statusText = 'Just now';
+                              } else if (diff.inMinutes < 60) {
+                                statusText = '${diff.inMinutes}m ago';
+                              } else if (diff.inHours < 24) {
+                                statusText = '${diff.inHours}h ago';
+                              } else {
+                                statusText = '${diff.inDays}d ago';
+                              }
+                            }
+                            return Text(
+                              statusText,
+                              style: TextStyle(
+                                color: isOnline
+                                    ? const Color(0xFF2ECC71)
+                                    : AppColors.mutedText,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            );
+                          },
                         );
                       },
                     ),
@@ -823,10 +983,13 @@ class _MessageBubble extends StatelessWidget {
     final receivedTextColor = isDark ? Colors.white : AppColors.darkPurple;
     final grouped = message.groupedReactions;
 
-    return GestureDetector(
-      onLongPress: () => _showOptions(context),
-      onDoubleTap: () => onReact('❤️'),
-      child: Padding(
+    return _SwipeToReply(
+      isSent: message.isSent,
+      onReply: onReply,
+      child: GestureDetector(
+        onLongPress: () => _showOptions(context),
+        onDoubleTap: () => onReact('❤️'),
+        child: Padding(
         padding: const EdgeInsets.only(bottom: 6),
         child: Row(
           mainAxisAlignment:
@@ -947,6 +1110,152 @@ class _MessageBubble extends StatelessWidget {
           ],
         ),
       ),
+      ),    // GestureDetector
+    );      // _SwipeToReply
+  }
+}
+
+// ── Swipe-to-reply wrapper ────────────────────────────────────────────────────
+
+class _SwipeToReply extends StatefulWidget {
+  final Widget child;
+  final bool isSent;
+  final VoidCallback onReply;
+
+  const _SwipeToReply({
+    required this.child,
+    required this.isSent,
+    required this.onReply,
+  });
+
+  @override
+  State<_SwipeToReply> createState() => _SwipeToReplyState();
+}
+
+class _SwipeToReplyState extends State<_SwipeToReply>
+    with SingleTickerProviderStateMixin {
+  double _dragX = 0;
+  bool _triggered = false;
+  late AnimationController _returnCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _returnCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
+  }
+
+  @override
+  void dispose() {
+    _returnCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onDragUpdate(DragUpdateDetails d) {
+    // Only allow right swipe for received, left swipe for sent
+    final delta = widget.isSent ? d.delta.dx.clamp(-60.0, 0.0) : d.delta.dx.clamp(0.0, 60.0);
+    setState(() {
+      _dragX = (_dragX + delta).clamp(widget.isSent ? -60.0 : 0.0, widget.isSent ? 0.0 : 60.0);
+      if (!_triggered && _dragX.abs() >= 50) {
+        _triggered = true;
+        HapticFeedback.lightImpact();
+      }
+    });
+  }
+
+  void _onDragEnd(DragEndDetails _) {
+    if (_triggered) widget.onReply();
+    _triggered = false;
+    setState(() => _dragX = 0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onHorizontalDragUpdate: _onDragUpdate,
+      onHorizontalDragEnd: _onDragEnd,
+      child: Stack(
+        alignment: widget.isSent ? Alignment.centerRight : Alignment.centerLeft,
+        children: [
+          if (_dragX.abs() > 10)
+            Positioned(
+              left: widget.isSent ? null : 4,
+              right: widget.isSent ? 4 : null,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 100),
+                opacity: (_dragX.abs() / 50).clamp(0.0, 1.0),
+                child: Container(
+                  width: 30, height: 30,
+                  decoration: BoxDecoration(
+                    color: AppColors.wisteria.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.reply_rounded,
+                      color: AppColors.wisteria, size: 18),
+                ),
+              ),
+            ),
+          Transform.translate(
+            offset: Offset(_dragX, 0),
+            child: widget.child,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Typing dots animation ─────────────────────────────────────────────────────
+
+class _TypingDots extends StatefulWidget {
+  const _TypingDots();
+  @override
+  State<_TypingDots> createState() => _TypingDotsState();
+}
+
+class _TypingDotsState extends State<_TypingDots>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, __) {
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(3, (i) {
+            final phase = (_ctrl.value * 3 - i).clamp(0.0, 1.0);
+            final scale = 0.6 + 0.4 * (phase < 0.5 ? phase * 2 : (1 - phase) * 2);
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 1.5),
+              width: 5 * scale,
+              height: 5 * scale,
+              decoration: BoxDecoration(
+                color: AppColors.wisteria.withOpacity(0.7 + 0.3 * scale),
+                shape: BoxShape.circle,
+              ),
+            );
+          }),
+        );
+      },
     );
   }
 }

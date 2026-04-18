@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
@@ -19,12 +20,10 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
   @override
   void initState() {
     super.initState();
-    _controller = VideoPlayerController.networkUrl(
-      Uri.parse(widget.videoUrl),
-    )..initialize().then((_) {
+    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl))
+      ..initialize().then((_) {
         if (mounted) setState(() => _initialized = true);
       });
-
     _controller.addListener(() {
       if (mounted) setState(() => _playing = _controller.value.isPlaying);
     });
@@ -37,14 +36,11 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
   }
 
   void _togglePlay() {
-    if (_controller.value.isPlaying) {
-      _controller.pause();
-    } else {
-      _controller.play();
-    }
+    _controller.value.isPlaying ? _controller.pause() : _controller.play();
   }
 
   void _openFullscreen() {
+    final pos = _controller.value.position;
     final wasPlaying = _controller.value.isPlaying;
     _controller.pause();
     Navigator.push(
@@ -54,7 +50,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
         barrierColor: Colors.black,
         pageBuilder: (_, __, ___) => _FullscreenVideoPage(
           videoUrl: widget.videoUrl,
-          startPosition: _controller.value.position,
+          startPosition: pos,
           autoPlay: wasPlaying,
         ),
       ),
@@ -74,58 +70,38 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
                 ? Stack(
                     alignment: Alignment.center,
                     children: [
-                      AspectRatio(
-                        aspectRatio: _controller.value.aspectRatio,
-                        child: VideoPlayer(_controller),
+                      Center(
+                        child: AspectRatio(
+                          aspectRatio: _controller.value.aspectRatio,
+                          child: VideoPlayer(_controller),
+                        ),
                       ),
-                      // Tap anywhere to toggle play/pause
                       Positioned.fill(
                         child: GestureDetector(
                           onTap: _togglePlay,
                           child: Container(color: Colors.transparent),
                         ),
                       ),
-                      // Play button overlay (visual only)
                       IgnorePointer(
                         child: AnimatedOpacity(
                           opacity: _playing ? 0.0 : 1.0,
-                          duration: const Duration(milliseconds: 300),
-                          child: Container(
-                            width: 56,
-                            height: 56,
-                            decoration: const BoxDecoration(
-                              color: AppColors.sunglow,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(Icons.play_arrow_rounded,
-                                color: AppColors.darkPurple, size: 32),
-                          ),
+                          duration: const Duration(milliseconds: 250),
+                          child: _PlayButton(size: 52),
                         ),
                       ),
-                      // Progress bar
                       Positioned(
                         bottom: 0,
                         left: 0,
                         right: 0,
-                        child: VideoProgressIndicator(
-                          _controller,
-                          allowScrubbing: true,
-                          colors: const VideoProgressColors(
-                            playedColor: AppColors.sunglow,
-                            bufferedColor: Colors.white24,
-                            backgroundColor: Colors.black26,
-                          ),
-                        ),
+                        child: _MiniProgressBar(controller: _controller),
                       ),
                     ],
                   )
                 : const Center(
                     child: CircularProgressIndicator(
-                        color: AppColors.sunglow, strokeWidth: 2),
-                  ),
+                        color: AppColors.sunglow, strokeWidth: 2)),
           ),
         ),
-        // Fullscreen button always on top, outside the tap-to-play zone
         Positioned(
           top: 8,
           right: 8,
@@ -149,7 +125,70 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
   }
 }
 
-// ── Fullscreen video page ──────────────────────────────────────────────────────
+// ── Mini progress bar (inline card) ──────────────────────────────────────────
+
+class _MiniProgressBar extends StatefulWidget {
+  final VideoPlayerController controller;
+  const _MiniProgressBar({required this.controller});
+
+  @override
+  State<_MiniProgressBar> createState() => _MiniProgressBarState();
+}
+
+class _MiniProgressBarState extends State<_MiniProgressBar> {
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_rebuild);
+  }
+
+  void _rebuild() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_rebuild);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return VideoProgressIndicator(
+      widget.controller,
+      allowScrubbing: true,
+      padding: EdgeInsets.zero,
+      colors: const VideoProgressColors(
+        playedColor: AppColors.sunglow,
+        bufferedColor: Colors.white24,
+        backgroundColor: Colors.black26,
+      ),
+    );
+  }
+}
+
+// ── Play button widget ────────────────────────────────────────────────────────
+
+class _PlayButton extends StatelessWidget {
+  final double size;
+  const _PlayButton({required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: const BoxDecoration(
+        color: AppColors.sunglow,
+        shape: BoxShape.circle,
+      ),
+      child: Icon(Icons.play_arrow_rounded,
+          color: AppColors.darkPurple, size: size * 0.6),
+    );
+  }
+}
+
+// ── Fullscreen video page ─────────────────────────────────────────────────────
 
 class _FullscreenVideoPage extends StatefulWidget {
   final String videoUrl;
@@ -169,8 +208,9 @@ class _FullscreenVideoPage extends StatefulWidget {
 class _FullscreenVideoPageState extends State<_FullscreenVideoPage> {
   late VideoPlayerController _controller;
   bool _initialized = false;
-  bool _playing = false;
   bool _showControls = true;
+  Timer? _hideTimer;
+  bool _dragging = false;
 
   @override
   void initState() {
@@ -187,36 +227,73 @@ class _FullscreenVideoPageState extends State<_FullscreenVideoPage> {
           _controller.seekTo(widget.startPosition);
           if (widget.autoPlay) _controller.play();
           setState(() => _initialized = true);
+          _scheduleHide();
         }
       });
 
     _controller.addListener(() {
-      if (mounted) setState(() => _playing = _controller.value.isPlaying);
+      if (mounted) setState(() {});
     });
   }
 
   @override
   void dispose() {
+    _hideTimer?.cancel();
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _controller.dispose();
     super.dispose();
   }
 
-  void _togglePlay() {
-    if (_controller.value.isPlaying) {
-      _controller.pause();
-    } else {
-      _controller.play();
-    }
+  void _scheduleHide() {
+    _hideTimer?.cancel();
+    _hideTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted && _controller.value.isPlaying && !_dragging) {
+        setState(() => _showControls = false);
+      }
+    });
   }
 
   void _toggleControls() {
     setState(() => _showControls = !_showControls);
+    if (_showControls) _scheduleHide();
+  }
+
+  void _togglePlay() {
+    if (_controller.value.isPlaying) {
+      _controller.pause();
+      setState(() => _showControls = true);
+      _hideTimer?.cancel();
+    } else {
+      _controller.play();
+      _scheduleHide();
+    }
+  }
+
+  void _skip(int seconds) {
+    final pos = _controller.value.position;
+    final dur = _controller.value.duration;
+    final target = pos + Duration(seconds: seconds);
+    _controller.seekTo(target.isNegative ? Duration.zero : (target > dur ? dur : target));
+    _scheduleHide();
+  }
+
+  String _fmt(Duration d) {
+    final h = d.inHours;
+    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return h > 0 ? '$h:$m:$s' : '$m:$s';
   }
 
   @override
   Widget build(BuildContext context) {
+    final dur = _initialized ? _controller.value.duration : Duration.zero;
+    final pos = _initialized ? _controller.value.position : Duration.zero;
+    final isPlaying = _controller.value.isPlaying;
+    final progress = dur.inMilliseconds > 0
+        ? pos.inMilliseconds / dur.inMilliseconds
+        : 0.0;
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
@@ -224,90 +301,244 @@ class _FullscreenVideoPageState extends State<_FullscreenVideoPage> {
         body: GestureDetector(
           onTap: _toggleControls,
           child: Stack(
-            alignment: Alignment.center,
+            fit: StackFit.expand,
             children: [
-              if (_initialized)
-                Center(
-                  child: AspectRatio(
-                    aspectRatio: _controller.value.aspectRatio,
-                    child: VideoPlayer(_controller),
-                  ),
-                )
-              else
-                const Center(
-                  child: CircularProgressIndicator(
-                      color: AppColors.sunglow, strokeWidth: 2),
-                ),
+              // Video
+              Center(
+                child: _initialized
+                    ? AspectRatio(
+                        aspectRatio: _controller.value.aspectRatio,
+                        child: VideoPlayer(_controller),
+                      )
+                    : const CircularProgressIndicator(
+                        color: AppColors.sunglow, strokeWidth: 2),
+              ),
+
+              // Controls overlay
               if (_initialized)
                 AnimatedOpacity(
                   opacity: _showControls ? 1.0 : 0.0,
-                  duration: const Duration(milliseconds: 250),
-                  child: Container(
-                    color: Colors.black26,
-                    child: Stack(
-                      children: [
-                        // Play/Pause center button
-                        Center(
-                          child: GestureDetector(
-                            onTap: _togglePlay,
-                            child: Container(
-                              width: 64,
-                              height: 64,
-                              decoration: const BoxDecoration(
-                                color: AppColors.sunglow,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                _playing
-                                    ? Icons.pause_rounded
-                                    : Icons.play_arrow_rounded,
-                                color: AppColors.darkPurple,
-                                size: 36,
+                  duration: const Duration(milliseconds: 200),
+                  child: IgnorePointer(
+                    ignoring: !_showControls,
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black54,
+                            Colors.transparent,
+                            Colors.transparent,
+                            Colors.black87,
+                          ],
+                          stops: [0.0, 0.25, 0.65, 1.0],
+                        ),
+                      ),
+                      child: Stack(
+                        children: [
+                          // Close button top-left
+                          Positioned(
+                            top: MediaQuery.of(context).padding.top + 8,
+                            left: 16,
+                            child: GestureDetector(
+                              onTap: () => Navigator.pop(context),
+                              child: Container(
+                                width: 38,
+                                height: 38,
+                                decoration: BoxDecoration(
+                                  color: Colors.black54,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(Icons.fullscreen_exit_rounded,
+                                    color: Colors.white, size: 22),
                               ),
                             ),
                           ),
-                        ),
-                        // Close button top-left
-                        Positioned(
-                          top: MediaQuery.of(context).padding.top + 8,
-                          left: 16,
-                          child: GestureDetector(
-                            onTap: () => Navigator.pop(context),
-                            child: Container(
-                              width: 36,
-                              height: 36,
-                              decoration: BoxDecoration(
-                                color: Colors.black54,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Icon(Icons.fullscreen_exit_rounded,
-                                  color: Colors.white, size: 22),
+
+                          // Center controls: -15s, play/pause, +15s
+                          Center(
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _SkipButton(
+                                  icon: Icons.replay_10_rounded,
+                                  label: '−15s',
+                                  onTap: () => _skip(-15),
+                                ),
+                                const SizedBox(width: 32),
+                                GestureDetector(
+                                  onTap: _togglePlay,
+                                  child: Container(
+                                    width: 68,
+                                    height: 68,
+                                    decoration: const BoxDecoration(
+                                      color: AppColors.sunglow,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      isPlaying
+                                          ? Icons.pause_rounded
+                                          : Icons.play_arrow_rounded,
+                                      color: AppColors.darkPurple,
+                                      size: 40,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 32),
+                                _SkipButton(
+                                  icon: Icons.forward_10_rounded,
+                                  label: '+15s',
+                                  onTap: () => _skip(15),
+                                ),
+                              ],
                             ),
                           ),
-                        ),
-                        // Progress bar bottom
-                        Positioned(
-                          bottom: 0,
-                          left: 0,
-                          right: 0,
-                          child: VideoProgressIndicator(
-                            _controller,
-                            allowScrubbing: true,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            colors: const VideoProgressColors(
-                              playedColor: AppColors.sunglow,
-                              bufferedColor: Colors.white24,
-                              backgroundColor: Colors.black26,
+
+                          // Bottom: time + scrubber
+                          Positioned(
+                            bottom: MediaQuery.of(context).padding.bottom + 16,
+                            left: 16,
+                            right: 16,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // Time labels
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(_fmt(pos),
+                                        style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600)),
+                                    Text(_fmt(dur),
+                                        style: const TextStyle(
+                                            color: Colors.white60,
+                                            fontSize: 12)),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                // Custom scrubber
+                                GestureDetector(
+                                  onTapDown: (d) {
+                                    final w = context.size?.width ?? 1;
+                                    final frac = (d.localPosition.dx - 16)
+                                        .clamp(0.0, w - 32) /
+                                        (w - 32);
+                                    _controller
+                                        .seekTo(dur * frac);
+                                    _scheduleHide();
+                                  },
+                                  onHorizontalDragStart: (_) {
+                                    _dragging = true;
+                                    _hideTimer?.cancel();
+                                  },
+                                  onHorizontalDragUpdate: (d) {
+                                    final w = context.size?.width ?? 1;
+                                    final frac = (d.localPosition.dx - 16)
+                                        .clamp(0.0, w - 32) /
+                                        (w - 32);
+                                    _controller.seekTo(dur * frac);
+                                  },
+                                  onHorizontalDragEnd: (_) {
+                                    _dragging = false;
+                                    _scheduleHide();
+                                  },
+                                  child: _Scrubber(progress: progress.clamp(0.0, 1.0)),
+                                ),
+                              ],
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ── Scrubber ──────────────────────────────────────────────────────────────────
+
+class _Scrubber extends StatelessWidget {
+  final double progress;
+  const _Scrubber({required this.progress});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 20,
+      child: Stack(
+        alignment: Alignment.centerLeft,
+        children: [
+          Container(
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.white24,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          FractionallySizedBox(
+            widthFactor: progress,
+            child: Container(
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.sunglow,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          FractionallySizedBox(
+            widthFactor: progress,
+            alignment: Alignment.centerLeft,
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Container(
+                width: 14,
+                height: 14,
+                decoration: const BoxDecoration(
+                  color: AppColors.sunglow,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Skip button ───────────────────────────────────────────────────────────────
+
+class _SkipButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  const _SkipButton(
+      {required this.icon, required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white, size: 36),
+          const SizedBox(height: 4),
+          Text(label,
+              style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500)),
+        ],
       ),
     );
   }

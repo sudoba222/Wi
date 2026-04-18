@@ -10,10 +10,16 @@ class ChatService {
 
   String get currentUserId => _auth.currentUser?.uid ?? '';
 
-  // Generate a consistent conversation ID for two users
   String _conversationId(String uid1, String uid2) {
     final sorted = [uid1, uid2]..sort();
     return '${sorted[0]}_${sorted[1]}';
+  }
+
+  // Extract the other participant's UID from a conversationId
+  String _otherUserId(String conversationId) {
+    return conversationId
+        .split('_')
+        .firstWhere((id) => id != currentUserId, orElse: () => '');
   }
 
   // Get or create a conversation between current user and another user
@@ -64,12 +70,22 @@ class ChatService {
           final otherUserName = userData['fullName'] ?? userData['email'] ?? 'Unknown';
           final otherUserPicture = userData['profilePicture'] ?? '';
 
+          // Online status: lastSeen within 2 minutes
+          bool isOnline = false;
+          final onlineRaw = userData['online'] ?? false;
+          final lastSeen = userData['lastSeen'];
+          if (onlineRaw && lastSeen != null) {
+            final lastSeenTime = (lastSeen as Timestamp).toDate();
+            isOnline = DateTime.now().difference(lastSeenTime).inMinutes < 2;
+          }
+
           conversations.add(Conversation.fromFirestore(
             doc,
             currentUserId,
             otherUserName,
             otherUserId,
             otherUserPicture,
+            isOnline: isOnline,
           ));
         } catch (e) {
           print('Error fetching user: $e');
@@ -122,9 +138,11 @@ class ChatService {
       if (replyToSenderName != null) 'replyToSenderName': replyToSenderName,
     });
 
+    final otherId = _otherUserId(conversationId);
     await _firestore.collection('conversations').doc(conversationId).update({
       'lastMessage': text,
       'lastMessageTime': now,
+      if (otherId.isNotEmpty) 'unreadCounts.$otherId': FieldValue.increment(1),
     });
   }
 
@@ -270,6 +288,11 @@ Future<void> markMessagesAsRead(String conversationId) async {
     }
   }
   await batch.commit();
+
+  // Reset unread counter for current user
+  await _firestore.collection('conversations').doc(conversationId).update({
+    'unreadCounts.$currentUserId': 0,
+  });
   }
   // Delete a conversation
   Future<void> deleteConversation(String conversationId) async {
@@ -284,6 +307,50 @@ Future<void> markMessagesAsRead(String conversationId) async {
     }
 
     await _firestore.collection('conversations').doc(conversationId).delete();
+  }
+
+  // Stream of total unread messages across all conversations
+  Stream<int> getTotalUnreadStream() {
+    if (currentUserId.isEmpty) return Stream.value(0);
+    return _firestore
+        .collection('conversations')
+        .where('participants', arrayContains: currentUserId)
+        .snapshots()
+        .map((snapshot) {
+      int total = 0;
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final counts = Map<String, dynamic>.from(data['unreadCounts'] ?? {});
+        total += (counts[currentUserId] as int?) ?? 0;
+      }
+      return total;
+    });
+  }
+
+  // Typing indicator
+  Future<void> setTyping(String conversationId, bool isTyping) async {
+    try {
+      await _firestore
+          .collection('conversations')
+          .doc(conversationId)
+          .update({
+        'typingUsers': isTyping
+            ? FieldValue.arrayUnion([currentUserId])
+            : FieldValue.arrayRemove([currentUserId]),
+      });
+    } catch (_) {}
+  }
+
+  Stream<bool> getTypingStream(String conversationId, String otherUserId) {
+    return _firestore
+        .collection('conversations')
+        .doc(conversationId)
+        .snapshots()
+        .map((doc) {
+      final data = doc.data() ?? {};
+      final typing = List<String>.from(data['typingUsers'] ?? []);
+      return typing.contains(otherUserId);
+    });
   }
 
   // Clear messages in a conversation

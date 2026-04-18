@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/post.dart';
 import '../models/comment.dart';
-import '../models/user_profile.dart';
 import 'auth_services.dart';
 // ignore_for_file: avoid_print
 
@@ -24,40 +23,65 @@ class PostService {
 
   // Create a new post
   Future<bool> createPost({
-  required String content,
-  List<String> mediaUrls = const [],
-  String mediaType = '',
-  String location = '',
-  List<String> taggedUsers = const [],
-}  ) async {
-  try {
-    final currentUser = _auth.currentUser;
-    if (currentUser == null) return false;
+    required String content,
+    List<String> mediaUrls = const [],
+    String mediaType = '',
+    String location = '',
+    List<String> taggedUsers = const [],
+    List<String> taggedUserNames = const [],
+  }) async {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) return false;
 
-    final authService = AuthService();
-    final userProfile = await authService.getFullUserProfile(currentUser.uid);
-    if (userProfile == null) return false;
+      final authService = AuthService();
+      final userProfile = await authService.getFullUserProfile(currentUser.uid);
+      if (userProfile == null) return false;
 
-    final postRef = _firestore.collection('posts').doc();
-    final post = Post(
-      id: postRef.id,
-      authorId: currentUser.uid,
-      author: userProfile.name,
-      authorProfilePicture: userProfile.profilePicture,
-      content: content,
-      timestamp: DateTime.now(),
-      mediaUrls: mediaUrls,
-      mediaType: mediaType,
-      location: location,
-      taggedUsers: taggedUsers,
-    );
+      final postRef = _firestore.collection('posts').doc();
+      final post = Post(
+        id: postRef.id,
+        authorId: currentUser.uid,
+        author: userProfile.name,
+        authorProfilePicture: userProfile.profilePicture,
+        content: content,
+        timestamp: DateTime.now(),
+        mediaUrls: mediaUrls,
+        mediaType: mediaType,
+        location: location,
+        taggedUsers: taggedUsers,
+        taggedUserNames: taggedUserNames,
+      );
 
-    await postRef.set(post.toFirestore());
-    return true;
-  } catch (e) {
-    print('Error creating post: $e');
-    return false;
-  }
+      await postRef.set(post.toFirestore());
+
+      // Send tag notifications
+      final now = Timestamp.now();
+      for (int i = 0; i < taggedUsers.length; i++) {
+        final uid = taggedUsers[i];
+        if (uid == currentUser.uid) continue;
+        try {
+          await _firestore
+              .collection('notifications')
+              .doc(uid)
+              .collection('items')
+              .add({
+            'type': 'tag',
+            'message': '${userProfile.name} tagged you in a post',
+            'senderName': userProfile.name,
+            'senderPhoto': userProfile.profilePicture,
+            'postId': postRef.id,
+            'read': false,
+            'createdAt': now,
+          });
+        } catch (_) {}
+      }
+
+      return true;
+    } catch (e) {
+      print('Error creating post: $e');
+      return false;
+    }
   }
   // Toggle like on a post
   Future<bool> toggleLike(String postId) async {

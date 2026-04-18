@@ -889,16 +889,7 @@ class _PostCardState extends State<_PostCard> {
                 if (post.taggedUsers.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.person_rounded, size: 13, color: AppColors.mutedText),
-                        const SizedBox(width: 4),
-                        Text(
-                          'with ${post.taggedUsers.length} ${post.taggedUsers.length == 1 ? 'person' : 'people'}',
-                          style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
-                        ),
-                      ],
-                    ),
+                    child: _TaggedUsersRow(taggedUserNames: post.taggedUserNames, count: post.taggedUsers.length),
                   ),
 
                 // Separator
@@ -953,6 +944,51 @@ class _PostCardState extends State<_PostCard> {
     if (diff.inHours < 24) return '${diff.inHours}h ago';
     if (diff.inDays < 7) return '${diff.inDays}d ago';
     return '${dt.day}/${dt.month}/${dt.year}';
+  }
+}
+
+class _TaggedUsersRow extends StatelessWidget {
+  final List<String> taggedUserNames;
+  final int count;
+  const _TaggedUsersRow({required this.taggedUserNames, required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    final names = taggedUserNames.isNotEmpty ? taggedUserNames : null;
+    String label;
+    if (names != null && names.isNotEmpty) {
+      if (names.length == 1) {
+        label = '@${names[0]}';
+      } else if (names.length == 2) {
+        label = '@${names[0]} and @${names[1]}';
+      } else {
+        label = '@${names[0]}, @${names[1]} and ${names.length - 2} more';
+      }
+    } else {
+      label = '$count ${count == 1 ? 'person' : 'people'}';
+    }
+
+    return Row(
+      children: [
+        const Icon(Icons.person_pin_rounded, size: 14, color: AppColors.wisteria),
+        const SizedBox(width: 5),
+        Text(
+          'with ',
+          style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
+        ),
+        Flexible(
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.wisteria,
+              fontWeight: FontWeight.w600,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
   }
 }
 

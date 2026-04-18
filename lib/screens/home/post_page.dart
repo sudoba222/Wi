@@ -174,8 +174,8 @@ class _PostPageState extends State<PostPage> {
         if (url != null) _uploadedMediaUrls.add(url);
       }
 
-      final taggedUserIds =
-          _taggedUsers.map((u) => u['uid'] as String).toList();
+      final taggedUserIds = _taggedUsers.map((u) => u['uid'] as String).toList();
+      final taggedUserNames = _taggedUsers.map((u) => u['name'] as String).toList();
 
       final success = await PostService().createPost(
         content: text,
@@ -183,6 +183,7 @@ class _PostPageState extends State<PostPage> {
         mediaType: _mediaType,
         location: _location,
         taggedUsers: taggedUserIds,
+        taggedUserNames: taggedUserNames,
       );
 
       if (!mounted) return;
@@ -248,22 +249,51 @@ class _PostPageState extends State<PostPage> {
           // Tagged users
           if (_taggedUsers.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-              child: Wrap(
-                spacing: 8,
-                children: _taggedUsers.map((u) {
-                  return Chip(
-                    label: Text('@${u['name']}',
-                        style: const TextStyle(fontSize: 12)),
-                    deleteIcon: const Icon(Icons.close, size: 14),
-                    onDeleted: () {
-                      setState(() => _taggedUsers.remove(u));
-                    },
-                    backgroundColor: AppColors.wisteria.withOpacity(0.15),
-                    side: BorderSide(
-                        color: AppColors.wisteria.withOpacity(0.3)),
-                  );
-                }).toList(),
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.person_pin_rounded, size: 14, color: AppColors.wisteria),
+                      const SizedBox(width: 6),
+                      Text('Tagged people',
+                          style: TextStyle(fontSize: 12, color: AppColors.wisteria, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: _taggedUsers.map((u) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: AppColors.wisteria.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: AppColors.wisteria.withOpacity(0.35)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.alternate_email_rounded, size: 13, color: AppColors.wisteria),
+                            const SizedBox(width: 4),
+                            Text(u['name'] as String,
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    color: AppColors.wisteria,
+                                    fontWeight: FontWeight.w600)),
+                            const SizedBox(width: 6),
+                            GestureDetector(
+                              onTap: () => setState(() => _taggedUsers.remove(u)),
+                              child: const Icon(Icons.close_rounded, size: 14, color: AppColors.wisteria),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
               ),
             ),
 
