@@ -94,31 +94,73 @@ class ChatService {
   }
 
   // Send a text message
-  Future<void> sendMessage(String conversationId, String text) async {
-  final messageRef = _firestore
-      .collection('conversations')
-      .doc(conversationId)
-      .collection('messages')
-      .doc();
+  Future<void> sendMessage(
+    String conversationId,
+    String text, {
+    String? replyToId,
+    String? replyToText,
+    String? replyToSenderName,
+  }) async {
+    final messageRef = _firestore
+        .collection('conversations')
+        .doc(conversationId)
+        .collection('messages')
+        .doc();
 
-  final now = Timestamp.now();
+    final now = Timestamp.now();
 
-  await messageRef.set({
-    'text': text,
-    'senderId': currentUserId,
-    'timestamp': now,
-    'type': 'text',
-    'meeting': null,
-    'readBy': [currentUserId], // sender has already read it
-  });
+    await messageRef.set({
+      'text': text,
+      'senderId': currentUserId,
+      'timestamp': now,
+      'type': 'text',
+      'meeting': null,
+      'readBy': [currentUserId],
+      'reactions': {},
+      if (replyToId != null) 'replyToId': replyToId,
+      if (replyToText != null) 'replyToText': replyToText,
+      if (replyToSenderName != null) 'replyToSenderName': replyToSenderName,
+    });
 
-  
-
-    // Update last message in conversation
     await _firestore.collection('conversations').doc(conversationId).update({
       'lastMessage': text,
       'lastMessageTime': now,
     });
+  }
+
+  // Toggle emoji reaction on a message
+  Future<void> toggleReaction(
+    String conversationId,
+    String messageId,
+    String emoji,
+  ) async {
+    final msgRef = _firestore
+        .collection('conversations')
+        .doc(conversationId)
+        .collection('messages')
+        .doc(messageId);
+
+    final doc = await msgRef.get();
+    final data = doc.data() ?? {};
+    final reactions = Map<String, String>.from(data['reactions'] ?? {});
+
+    if (reactions[currentUserId] == emoji) {
+      reactions.remove(currentUserId);
+    } else {
+      reactions[currentUserId] = emoji;
+    }
+
+    await msgRef.update({'reactions': reactions});
+  }
+
+  // Delete a single message
+  Future<void> deleteMessage(String conversationId, String messageId) async {
+    await _firestore
+        .collection('conversations')
+        .doc(conversationId)
+        .collection('messages')
+        .doc(messageId)
+        .delete();
   }
 
   // check if the user is online or not

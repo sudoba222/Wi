@@ -37,6 +37,10 @@ class Message {
   final DateTime timestamp;
   final MeetingData? meeting;
   final List<String> readBy;
+  final Map<String, String> reactions; // userId → emoji
+  final String? replyToId;
+  final String? replyToText;
+  final String? replyToSenderName;
 
   Message({
     required this.id,
@@ -47,9 +51,21 @@ class Message {
     required this.timestamp,
     this.meeting,
     this.readBy = const [],
+    this.reactions = const {},
+    this.replyToId,
+    this.replyToText,
+    this.replyToSenderName,
   });
 
   bool isReadBy(String userId) => readBy.contains(userId);
+
+  Map<String, int> get groupedReactions {
+    final counts = <String, int>{};
+    for (final emoji in reactions.values) {
+      counts[emoji] = (counts[emoji] ?? 0) + 1;
+    }
+    return counts;
+  }
 
   Map<String, dynamic> toMap() => {
     'text': text,
@@ -58,6 +74,10 @@ class Message {
     'type': meeting != null ? 'meeting' : 'text',
     'meeting': meeting?.toMap(),
     'readBy': readBy,
+    'reactions': reactions,
+    if (replyToId != null) 'replyToId': replyToId,
+    if (replyToText != null) 'replyToText': replyToText,
+    if (replyToSenderName != null) 'replyToSenderName': replyToSenderName,
   };
 
   factory Message.fromFirestore(DocumentSnapshot doc, String currentUserId) {
@@ -77,6 +97,10 @@ class Message {
       meeting: data['meeting'] != null
           ? MeetingData.fromMap(data['meeting'] as Map<String, dynamic>)
           : null,
+      reactions: Map<String, String>.from(data['reactions'] ?? {}),
+      replyToId: data['replyToId'],
+      replyToText: data['replyToText'],
+      replyToSenderName: data['replyToSenderName'],
     );
   }
 }
