@@ -11,6 +11,7 @@ class Post {
   final String mediaType;
   final String location;
   final List<String> taggedUsers;
+  final List<String> taggedUserNames;
   List<String> likedBy;
   int likes;
   int comments;
@@ -26,6 +27,7 @@ class Post {
     this.mediaType = '',
     this.location = '',
     this.taggedUsers = const [],
+    this.taggedUserNames = const [],
     this.likedBy = const [],
     this.likes = 0,
     this.comments = 0,
@@ -46,6 +48,7 @@ class Post {
       mediaType: data['mediaType'] ?? '',
       location: data['location'] ?? '',
       taggedUsers: List<String>.from(data['taggedUsers'] ?? []),
+      taggedUserNames: List<String>.from(data['taggedUserNames'] ?? []),
       likedBy: List<String>.from(data['likedBy'] ?? []),
       likes: data['likes'] ?? 0,
       comments: data['comments'] ?? 0,
@@ -63,6 +66,7 @@ class Post {
       'mediaType': mediaType,
       'location': location,
       'taggedUsers': taggedUsers,
+      'taggedUserNames': taggedUserNames,
       'likedBy': likedBy,
       'likes': likes,
       'comments': comments,
@@ -80,6 +84,7 @@ class Post {
     String? mediaType,
     String? location,
     List<String>? taggedUsers,
+    List<String>? taggedUserNames,
     List<String>? likedBy,
     int? likes,
     int? comments,
@@ -95,6 +100,7 @@ class Post {
       mediaType: mediaType ?? this.mediaType,
       location: location ?? this.location,
       taggedUsers: taggedUsers ?? this.taggedUsers,
+      taggedUserNames: taggedUserNames ?? this.taggedUserNames,
       likedBy: likedBy ?? this.likedBy,
       likes: likes ?? this.likes,
       comments: comments ?? this.comments,

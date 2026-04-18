@@ -360,20 +360,60 @@ class _ConversationTile extends StatelessWidget {
               child: Row(
                 children: [
                   Stack(
+                    clipBehavior: Clip.none,
                     children: [
                       conversation.otherUserProfilePicture.isNotEmpty
-                          ? CircleAvatar(radius: 25, backgroundImage: NetworkImage(conversation.otherUserProfilePicture))
+                          ? CircleAvatar(
+                              radius: 25,
+                              backgroundImage: NetworkImage(
+                                  conversation.otherUserProfilePicture))
                           : Container(
                               width: 50, height: 50,
-                              decoration: const BoxDecoration(shape: BoxShape.circle,
-                                gradient: LinearGradient(colors: [AppColors.wisteria, AppColors.splashPurple])),
-                              child: Center(child: Text(initial, style: const TextStyle(color: AppColors.white, fontSize: 20, fontWeight: FontWeight.bold))),
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: LinearGradient(colors: [
+                                  AppColors.wisteria,
+                                  AppColors.splashPurple
+                                ]),
+                              ),
+                              child: Center(
+                                child: Text(initial,
+                                    style: const TextStyle(
+                                        color: AppColors.white,
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold)),
+                              ),
                             ),
-                      if (isPinned)
-                        Positioned(right: 0, bottom: 0,
-                          child: Container(width: 18, height: 18,
-                            decoration: const BoxDecoration(color: AppColors.sunglow, shape: BoxShape.circle),
-                            child: const Icon(Icons.push_pin_rounded, size: 11, color: AppColors.darkPurple))),
+                      // Online green dot
+                      if (conversation.isOnline)
+                        Positioned(
+                          right: 0,
+                          bottom: 0,
+                          child: Container(
+                            width: 13, height: 13,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF2ECC71),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                  color: isDark
+                                      ? const Color(0xFF1E0B2C)
+                                      : Colors.white,
+                                  width: 2),
+                            ),
+                          ),
+                        )
+                      else if (isPinned)
+                        Positioned(
+                          right: 0, bottom: 0,
+                          child: Container(
+                            width: 18, height: 18,
+                            decoration: const BoxDecoration(
+                                color: AppColors.sunglow,
+                                shape: BoxShape.circle),
+                            child: const Icon(Icons.push_pin_rounded,
+                                size: 11, color: AppColors.darkPurple),
+                          ),
+                        ),
                     ],
                   ),
                   const SizedBox(width: 14),
@@ -381,16 +421,70 @@ class _ConversationTile extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(name, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700,
-                            color: isDark ? Colors.white : AppColors.darkPurple)),
+                        Text(name,
+                            style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: conversation.unreadCount > 0
+                                    ? FontWeight.w800
+                                    : FontWeight.w700,
+                                color: isDark
+                                    ? Colors.white
+                                    : AppColors.darkPurple)),
                         const SizedBox(height: 3),
-                        Text(conversation.lastMessage, style: const TextStyle(fontSize: 13, color: AppColors.mutedText),
-                            maxLines: 1, overflow: TextOverflow.ellipsis),
+                        Text(
+                          conversation.lastMessage,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: conversation.unreadCount > 0
+                                ? (isDark ? Colors.white70 : AppColors.darkPurple.withOpacity(0.75))
+                                : AppColors.mutedText,
+                            fontWeight: conversation.unreadCount > 0
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ],
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Text(conversation.lastMessageTime, style: const TextStyle(fontSize: 12, color: AppColors.mutedText)),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(conversation.lastMessageTime,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: conversation.unreadCount > 0
+                                ? AppColors.wisteria
+                                : AppColors.mutedText,
+                            fontWeight: conversation.unreadCount > 0
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                          )),
+                      if (conversation.unreadCount > 0) ...[
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.wisteria,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            conversation.unreadCount > 99
+                                ? '99+'
+                                : '${conversation.unreadCount}',
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ],
               ),
             ),

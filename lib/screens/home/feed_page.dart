@@ -15,6 +15,7 @@ import '../profile/profile_page.dart';
 import 'home_page.dart';
 import 'job_page.dart';
 import '../../widgets/video_player_widget.dart';
+import '../../widgets/fullscreen_image_viewer.dart';
 
 // ─── Mock post data ────────────────────────────────────────────────────────────
 
@@ -491,7 +492,9 @@ class _MockPostCardState extends State<_MockPostCard> {
                 if (d.imageUrl != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 12),
-                    child: ClipRRect(
+                    child: GestureDetector(
+                      onTap: () => FullscreenImageViewer.show(
+                          context, [d.imageUrl!]),
                       child: Image.network(
                         d.imageUrl!,
                         width: double.infinity,
@@ -601,7 +604,17 @@ class _PostCardState extends State<_PostCard> {
       } else {
         await ref.update({'likedBy': FieldValue.arrayUnion([widget.currentUserId])});
       }
-    } catch (_) {}
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not update like: ${e.toString()}'),
+            backgroundColor: Colors.redAccent,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
     if (mounted) setState(() => _likeLoading = false);
   }
 
@@ -811,27 +824,31 @@ class _PostCardState extends State<_PostCard> {
                   Padding(
                     padding: const EdgeInsets.only(top: 4, bottom: 12),
                     child: post.mediaUrls.length == 1
-                        ? Image.network(
-                            post.mediaUrls.first,
-                            width: double.infinity,
-                            height: 220,
-                            fit: BoxFit.cover,
-                            loadingBuilder: (_, child, progress) => progress == null
-                                ? child
-                                : Container(
-                                    height: 220,
-                                    color: AppColors.wisteria.withOpacity(0.1),
-                                    child: const Center(
-                                      child: CircularProgressIndicator(
-                                          color: AppColors.wisteria, strokeWidth: 2),
+                        ? GestureDetector(
+                            onTap: () => FullscreenImageViewer.show(
+                                context, post.mediaUrls),
+                            child: Image.network(
+                              post.mediaUrls.first,
+                              width: double.infinity,
+                              height: 220,
+                              fit: BoxFit.cover,
+                              loadingBuilder: (_, child, progress) => progress == null
+                                  ? child
+                                  : Container(
+                                      height: 220,
+                                      color: AppColors.wisteria.withOpacity(0.1),
+                                      child: const Center(
+                                        child: CircularProgressIndicator(
+                                            color: AppColors.wisteria, strokeWidth: 2),
+                                      ),
                                     ),
-                                  ),
-                            errorBuilder: (_, __, ___) => Container(
-                              height: 160,
-                              color: AppColors.wisteria.withOpacity(0.08),
-                              child: const Center(
-                                child: Icon(Icons.image_outlined,
-                                    color: AppColors.wisteria, size: 40),
+                              errorBuilder: (_, __, ___) => Container(
+                                height: 160,
+                                color: AppColors.wisteria.withOpacity(0.08),
+                                child: const Center(
+                                  child: Icon(Icons.image_outlined,
+                                      color: AppColors.wisteria, size: 40),
+                                ),
                               ),
                             ),
                           )
@@ -841,14 +858,18 @@ class _PostCardState extends State<_PostCard> {
                               scrollDirection: Axis.horizontal,
                               padding: const EdgeInsets.symmetric(horizontal: 16),
                               itemCount: post.mediaUrls.length,
-                              itemBuilder: (_, i) => Container(
-                                margin: const EdgeInsets.only(right: 8),
-                                width: 180,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(12),
-                                  image: DecorationImage(
-                                    image: NetworkImage(post.mediaUrls[i]),
-                                    fit: BoxFit.cover,
+                              itemBuilder: (_, i) => GestureDetector(
+                                onTap: () => FullscreenImageViewer.show(
+                                    context, post.mediaUrls, index: i),
+                                child: Container(
+                                  margin: const EdgeInsets.only(right: 8),
+                                  width: 180,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(12),
+                                    image: DecorationImage(
+                                      image: NetworkImage(post.mediaUrls[i]),
+                                      fit: BoxFit.cover,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -868,16 +889,7 @@ class _PostCardState extends State<_PostCard> {
                 if (post.taggedUsers.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.person_rounded, size: 13, color: AppColors.mutedText),
-                        const SizedBox(width: 4),
-                        Text(
-                          'with ${post.taggedUsers.length} ${post.taggedUsers.length == 1 ? 'person' : 'people'}',
-                          style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
-                        ),
-                      ],
-                    ),
+                    child: _TaggedUsersRow(taggedUserNames: post.taggedUserNames, count: post.taggedUsers.length),
                   ),
 
                 // Separator
@@ -932,6 +944,51 @@ class _PostCardState extends State<_PostCard> {
     if (diff.inHours < 24) return '${diff.inHours}h ago';
     if (diff.inDays < 7) return '${diff.inDays}d ago';
     return '${dt.day}/${dt.month}/${dt.year}';
+  }
+}
+
+class _TaggedUsersRow extends StatelessWidget {
+  final List<String> taggedUserNames;
+  final int count;
+  const _TaggedUsersRow({required this.taggedUserNames, required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    final names = taggedUserNames.isNotEmpty ? taggedUserNames : null;
+    String label;
+    if (names != null && names.isNotEmpty) {
+      if (names.length == 1) {
+        label = '@${names[0]}';
+      } else if (names.length == 2) {
+        label = '@${names[0]} and @${names[1]}';
+      } else {
+        label = '@${names[0]}, @${names[1]} and ${names.length - 2} more';
+      }
+    } else {
+      label = '$count ${count == 1 ? 'person' : 'people'}';
+    }
+
+    return Row(
+      children: [
+        const Icon(Icons.person_pin_rounded, size: 14, color: AppColors.wisteria),
+        const SizedBox(width: 5),
+        Text(
+          'with ',
+          style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
+        ),
+        Flexible(
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.wisteria,
+              fontWeight: FontWeight.w600,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
   }
 }
 

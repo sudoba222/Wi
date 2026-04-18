@@ -7,6 +7,7 @@ import '../../utils/app_colors.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/language_provider.dart';
 import '../../services/auth_services.dart';
+import '../../services/chat_service.dart';
 import '../../models/user_profile.dart';
 import '../profile/profile_page.dart';
 import '../settings/about_page.dart';
@@ -27,6 +28,7 @@ class _HomePageState extends State<HomePage> {
   int _currentIndex = 0;
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   UserProfile? _userProfile;
+  int _totalUnread = 0;
 
   final _pages = [FeedPage(), MessagesPage()];
 
@@ -34,6 +36,14 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _loadProfile();
+    _subscribeUnread();
+  }
+
+  void _subscribeUnread() {
+    final chatService = Provider.of<ChatService>(context, listen: false);
+    chatService.getTotalUnreadStream().listen((count) {
+      if (mounted) setState(() => _totalUnread = count);
+    });
   }
 
   Future<void> _loadProfile() async {
@@ -59,7 +69,12 @@ class _HomePageState extends State<HomePage> {
         child: IndexedStack(index: _currentIndex, children: _pages),
       ),
       drawer: _AppDrawer(userProfile: _userProfile, onProfileUpdated: _loadProfile),
-      bottomNavigationBar: _BottomBar(currentIndex: _currentIndex, onTap: _onTap, onPost: _openPost),
+      bottomNavigationBar: _BottomBar(
+        currentIndex: _currentIndex,
+        onTap: _onTap,
+        onPost: _openPost,
+        unreadMessages: _totalUnread,
+      ),
     );
   }
 }
@@ -91,6 +106,7 @@ class _AppDrawer extends StatelessWidget {
     final bg = isDark ? const Color(0xFF1E0B2C) : AppColors.white;
     final text = isDark ? Colors.white : AppColors.darkPurple;
     final sub = isDark ? Colors.white54 : AppColors.mutedText;
+    final profile = userProfile;
 
     return Drawer(
       backgroundColor: bg,
@@ -126,12 +142,12 @@ class _AppDrawer extends StatelessWidget {
                             style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800)),
                         const SizedBox(height: 2),
                         // Job title
-                        if (userProfile?.jobTitle?.isNotEmpty == true)
-                          Text(userProfile!.jobTitle!,
+                        if (profile != null && profile.jobTitle.isNotEmpty)
+                          Text(profile.jobTitle,
                               style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
                         // Company
-                        if (userProfile?.company?.isNotEmpty == true)
-                          Text(userProfile!.company!,
+                        if (profile != null && profile.company.isNotEmpty)
+                          Text(profile.company,
                               style: TextStyle(color: Colors.white.withOpacity(0.75), fontSize: 12)),
                         const SizedBox(height: 2),
                         // Email in smaller muted text
@@ -300,8 +316,17 @@ class _GradAvatar extends StatelessWidget {
 
 // Floating bottom nav pill
 class _BottomBar extends StatelessWidget {
-  final int currentIndex; final ValueChanged<int> onTap; final VoidCallback onPost;
-  const _BottomBar({required this.currentIndex, required this.onTap, required this.onPost});
+  final int currentIndex;
+  final ValueChanged<int> onTap;
+  final VoidCallback onPost;
+  final int unreadMessages;
+
+  const _BottomBar({
+    required this.currentIndex,
+    required this.onTap,
+    required this.onPost,
+    this.unreadMessages = 0,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -323,8 +348,13 @@ class _BottomBar extends StatelessWidget {
           ),
           child: Row(
             children: [
-              _NavItem(icon: Icons.home_outlined, activeIcon: Icons.home_rounded, index: 0, currentIndex: currentIndex, onTap: onTap),
-              // Center amber post button
+              _NavItem(
+                icon: Icons.home_outlined,
+                activeIcon: Icons.home_rounded,
+                index: 0,
+                currentIndex: currentIndex,
+                onTap: onTap,
+              ),
               Expanded(
                 child: GestureDetector(
                   onTap: onPost,
@@ -341,7 +371,14 @@ class _BottomBar extends StatelessWidget {
                   ),
                 ),
               ),
-              _NavItem(icon: Icons.chat_bubble_outline_rounded, activeIcon: Icons.chat_bubble_rounded, index: 1, currentIndex: currentIndex, onTap: onTap),
+              _NavItem(
+                icon: Icons.chat_bubble_outline_rounded,
+                activeIcon: Icons.chat_bubble_rounded,
+                index: 1,
+                currentIndex: currentIndex,
+                onTap: onTap,
+                badgeCount: unreadMessages,
+              ),
             ],
           ),
         ),
@@ -352,8 +389,21 @@ class _BottomBar extends StatelessWidget {
 
 // A nav tab with an animated amber indicator line above the icon
 class _NavItem extends StatelessWidget {
-  final IconData icon; final IconData activeIcon; final int index; final int currentIndex; final ValueChanged<int> onTap;
-  const _NavItem({required this.icon, required this.activeIcon, required this.index, required this.currentIndex, required this.onTap});
+  final IconData icon;
+  final IconData activeIcon;
+  final int index;
+  final int currentIndex;
+  final ValueChanged<int> onTap;
+  final int badgeCount;
+
+  const _NavItem({
+    required this.icon,
+    required this.activeIcon,
+    required this.index,
+    required this.currentIndex,
+    required this.onTap,
+    this.badgeCount = 0,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -366,15 +416,48 @@ class _NavItem extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Indicator pill — animates width to 0 when inactive
             AnimatedContainer(
               duration: const Duration(milliseconds: 220),
-              width: isActive ? 22 : 0, height: 3,
+              width: isActive ? 22 : 0,
+              height: 3,
               margin: const EdgeInsets.only(bottom: 6),
-              decoration: BoxDecoration(color: AppColors.sunglow, borderRadius: BorderRadius.circular(2)),
+              decoration: BoxDecoration(
+                  color: AppColors.sunglow,
+                  borderRadius: BorderRadius.circular(2)),
             ),
-            Icon(isActive ? activeIcon : icon, size: 26,
-              color: isActive ? (isDark ? AppColors.sunglow : AppColors.darkPurple) : AppColors.mutedText),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(
+                  isActive ? activeIcon : icon,
+                  size: 26,
+                  color: isActive
+                      ? (isDark ? AppColors.sunglow : AppColors.darkPurple)
+                      : AppColors.mutedText,
+                ),
+                if (badgeCount > 0)
+                  Positioned(
+                    top: -4,
+                    right: -6,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 4, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        badgeCount > 99 ? '99+' : '$badgeCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ],
         ),
       ),
