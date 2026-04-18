@@ -30,13 +30,14 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
-  bool _hasText = false;
+  final _hasText = ValueNotifier<bool>(false);
+  int _prevMessageCount = 0;
 
   @override
   void initState() {
     super.initState();
     _controller.addListener(() {
-      setState(() => _hasText = _controller.text.trim().isNotEmpty);
+      _hasText.value = _controller.text.trim().isNotEmpty;
     });
     // Mark messages as read when chat opens
   WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -50,6 +51,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void dispose() {
     _controller.dispose();
     _scrollController.dispose();
+    _hasText.dispose();
     super.dispose();
   }
 
@@ -344,8 +346,11 @@ class _ChatScreenState extends State<ChatScreen> {
                     return _buildEmptyState(name);
                   }
 
-                  WidgetsBinding.instance
-                      .addPostFrameCallback((_) => _scrollToBottom());
+                  if (messages.length > _prevMessageCount) {
+                    _prevMessageCount = messages.length;
+                    WidgetsBinding.instance
+                        .addPostFrameCallback((_) => _scrollToBottom());
+                  }
 
                   return ListView.builder(
                     controller: _scrollController,
@@ -580,19 +585,22 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: _hasText ? _sendMessage : null,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    width: 44, height: 44,
-                    decoration: BoxDecoration(
-                      color: _hasText ? AppColors.sunglow : AppColors.background,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      _hasText ? Icons.send_rounded : Icons.mic_rounded,
-                      color: _hasText ? AppColors.darkPurple : AppColors.mutedText,
-                      size: 20,
+                ValueListenableBuilder<bool>(
+                  valueListenable: _hasText,
+                  builder: (_, hasText, __) => GestureDetector(
+                    onTap: hasText ? _sendMessage : null,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      width: 44, height: 44,
+                      decoration: BoxDecoration(
+                        color: hasText ? AppColors.sunglow : AppColors.background,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        hasText ? Icons.send_rounded : Icons.mic_rounded,
+                        color: hasText ? AppColors.darkPurple : AppColors.mutedText,
+                        size: 20,
+                      ),
                     ),
                   ),
                 ),
