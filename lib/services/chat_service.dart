@@ -327,31 +327,6 @@ Future<void> markMessagesAsRead(String conversationId) async {
     });
   }
 
-  // Typing indicator
-  Future<void> setTyping(String conversationId, bool isTyping) async {
-    try {
-      await _firestore
-          .collection('conversations')
-          .doc(conversationId)
-          .update({
-        'typingUsers': isTyping
-            ? FieldValue.arrayUnion([currentUserId])
-            : FieldValue.arrayRemove([currentUserId]),
-      });
-    } catch (_) {}
-  }
-
-  Stream<bool> getTypingStream(String conversationId, String otherUserId) {
-    return _firestore
-        .collection('conversations')
-        .doc(conversationId)
-        .snapshots()
-        .map((doc) {
-      final data = doc.data() ?? {};
-      final typing = List<String>.from(data['typingUsers'] ?? []);
-      return typing.contains(otherUserId);
-    });
-  }
 
   // Clear messages in a conversation
   Future<void> clearMessages(String conversationId) async {

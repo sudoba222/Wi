@@ -40,10 +40,6 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _showScrollDown = false;
   int _unreadWhileScrolled = 0;
 
-  // Typing indicator
-  Timer? _typingTimer;
-  bool _wasTyping = false;
-
   @override
   void initState() {
     super.initState();
@@ -58,25 +54,6 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _onTextChanged() {
     _hasText.value = _controller.text.trim().isNotEmpty;
-    _handleTyping(_controller.text.trim().isNotEmpty);
-  }
-
-  void _handleTyping(bool isTyping) {
-    final chatService = Provider.of<ChatService>(context, listen: false);
-    if (isTyping && !_wasTyping) {
-      _wasTyping = true;
-      chatService.setTyping(widget.conversationId, true);
-    }
-    _typingTimer?.cancel();
-    if (isTyping) {
-      _typingTimer = Timer(const Duration(seconds: 3), () {
-        _wasTyping = false;
-        chatService.setTyping(widget.conversationId, false);
-      });
-    } else if (_wasTyping) {
-      _wasTyping = false;
-      chatService.setTyping(widget.conversationId, false);
-    }
   }
 
   void _onScroll() {
@@ -95,9 +72,6 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
-    _typingTimer?.cancel();
-    final chatService = Provider.of<ChatService>(context, listen: false);
-    chatService.setTyping(widget.conversationId, false);
     _controller.removeListener(_onTextChanged);
     _scrollController.removeListener(_onScroll);
     _controller.dispose();
@@ -590,76 +564,50 @@ class _ChatScreenState extends State<ChatScreen> {
                             color: isDark ? Colors.white : AppColors.darkPurple,
                             fontSize: 15,
                             fontWeight: FontWeight.w700)),
-                    StreamBuilder<bool>(
+                    StreamBuilder<Map<String, dynamic>>(
                       stream: Provider.of<ChatService>(context,
                               listen: false)
-                          .getTypingStream(
-                              widget.conversationId,
-                              widget.otherUserId),
-                      builder: (context, typingSnap) {
-                        final isTyping = typingSnap.data ?? false;
-                        if (isTyping) {
-                          return Row(
-                            children: [
-                              _TypingDots(),
-                              const SizedBox(width: 5),
-                              const Text(
-                                'typing…',
-                                style: TextStyle(
-                                  color: AppColors.wisteria,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          );
+                          .getUserPresenceStream(widget.otherUserId),
+                      builder: (context, snapshot) {
+                        final data = snapshot.data ?? {};
+                        final isOnlineRaw = data['online'] ?? false;
+                        final lastSeen = data['lastSeen'];
+                        bool isOnline = false;
+                        if (isOnlineRaw && lastSeen != null) {
+                          final lastSeenTime =
+                              (lastSeen as dynamic).toDate() as DateTime;
+                          isOnline = DateTime.now()
+                                  .difference(lastSeenTime)
+                                  .inMinutes <
+                              2;
                         }
-                        return StreamBuilder<Map<String, dynamic>>(
-                          stream: Provider.of<ChatService>(context,
-                                  listen: false)
-                              .getUserPresenceStream(widget.otherUserId),
-                          builder: (context, snapshot) {
-                            final data = snapshot.data ?? {};
-                            final isOnlineRaw = data['online'] ?? false;
-                            final lastSeen = data['lastSeen'];
-                            bool isOnline = false;
-                            if (isOnlineRaw && lastSeen != null) {
-                              final lastSeenTime =
-                                  (lastSeen as dynamic).toDate() as DateTime;
-                              isOnline = DateTime.now()
-                                      .difference(lastSeenTime)
-                                      .inMinutes <
-                                  2;
-                            }
-                            String statusText = 'Offline';
-                            if (isOnline) {
-                              statusText = 'Online';
-                            } else if (lastSeen != null) {
-                              final lastSeenTime =
-                                  (lastSeen as dynamic).toDate() as DateTime;
-                              final diff =
-                                  DateTime.now().difference(lastSeenTime);
-                              if (diff.inMinutes < 1) {
-                                statusText = 'Just now';
-                              } else if (diff.inMinutes < 60) {
-                                statusText = '${diff.inMinutes}m ago';
-                              } else if (diff.inHours < 24) {
-                                statusText = '${diff.inHours}h ago';
-                              } else {
-                                statusText = '${diff.inDays}d ago';
-                              }
-                            }
-                            return Text(
-                              statusText,
-                              style: TextStyle(
-                                color: isOnline
-                                    ? const Color(0xFF2ECC71)
-                                    : AppColors.mutedText,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            );
-                          },
+                        String statusText = 'Offline';
+                        if (isOnline) {
+                          statusText = 'Online';
+                        } else if (lastSeen != null) {
+                          final lastSeenTime =
+                              (lastSeen as dynamic).toDate() as DateTime;
+                          final diff =
+                              DateTime.now().difference(lastSeenTime);
+                          if (diff.inMinutes < 1) {
+                            statusText = 'Just now';
+                          } else if (diff.inMinutes < 60) {
+                            statusText = '${diff.inMinutes}m ago';
+                          } else if (diff.inHours < 24) {
+                            statusText = '${diff.inHours}h ago';
+                          } else {
+                            statusText = '${diff.inDays}d ago';
+                          }
+                        }
+                        return Text(
+                          statusText,
+                          style: TextStyle(
+                            color: isOnline
+                                ? const Color(0xFF2ECC71)
+                                : AppColors.mutedText,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
                         );
                       },
                     ),
@@ -1210,58 +1158,6 @@ class _SwipeToReplyState extends State<_SwipeToReply>
   }
 }
 
-// ── Typing dots animation ─────────────────────────────────────────────────────
-
-class _TypingDots extends StatefulWidget {
-  const _TypingDots();
-  @override
-  State<_TypingDots> createState() => _TypingDotsState();
-}
-
-class _TypingDotsState extends State<_TypingDots>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _ctrl,
-      builder: (_, __) {
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: List.generate(3, (i) {
-            final phase = (_ctrl.value * 3 - i).clamp(0.0, 1.0);
-            final scale = 0.6 + 0.4 * (phase < 0.5 ? phase * 2 : (1 - phase) * 2);
-            return Container(
-              margin: const EdgeInsets.symmetric(horizontal: 1.5),
-              width: 5 * scale,
-              height: 5 * scale,
-              decoration: BoxDecoration(
-                color: AppColors.wisteria.withOpacity(0.7 + 0.3 * scale),
-                shape: BoxShape.circle,
-              ),
-            );
-          }),
-        );
-      },
-    );
-  }
-}
 
 // ── Reply bar above text input ────────────────────────────────────────────────
 
