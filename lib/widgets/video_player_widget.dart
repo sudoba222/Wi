@@ -63,83 +63,88 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        height: 220,
-        color: Colors.black,
-        child: _initialized
-            ? Stack(
-                alignment: Alignment.center,
-                children: [
-                  AspectRatio(
-                    aspectRatio: _controller.value.aspectRatio,
-                    child: VideoPlayer(_controller),
-                  ),
-                  // Tap anywhere to toggle play/pause
-                  Positioned.fill(
-                    child: GestureDetector(
-                      onTap: _togglePlay,
-                      child: Container(color: Colors.transparent),
-                    ),
-                  ),
-                  // Play button overlay
-                  IgnorePointer(
-                    child: AnimatedOpacity(
-                      opacity: _playing ? 0.0 : 1.0,
-                      duration: const Duration(milliseconds: 300),
-                      child: Container(
-                        width: 56,
-                        height: 56,
-                        decoration: const BoxDecoration(
-                          color: AppColors.sunglow,
-                          shape: BoxShape.circle,
+    return Stack(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            height: 220,
+            color: Colors.black,
+            child: _initialized
+                ? Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      AspectRatio(
+                        aspectRatio: _controller.value.aspectRatio,
+                        child: VideoPlayer(_controller),
+                      ),
+                      // Tap anywhere to toggle play/pause
+                      Positioned.fill(
+                        child: GestureDetector(
+                          onTap: _togglePlay,
+                          child: Container(color: Colors.transparent),
                         ),
-                        child: const Icon(Icons.play_arrow_rounded,
-                            color: AppColors.darkPurple, size: 32),
                       ),
-                    ),
-                  ),
-                  // Progress bar
-                  Positioned(
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    child: VideoProgressIndicator(
-                      _controller,
-                      allowScrubbing: true,
-                      colors: const VideoProgressColors(
-                        playedColor: AppColors.sunglow,
-                        bufferedColor: Colors.white24,
-                        backgroundColor: Colors.black26,
-                      ),
-                    ),
-                  ),
-                  // Fullscreen button
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: GestureDetector(
-                      onTap: _openFullscreen,
-                      child: Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: Colors.black54,
-                          borderRadius: BorderRadius.circular(6),
+                      // Play button overlay (visual only)
+                      IgnorePointer(
+                        child: AnimatedOpacity(
+                          opacity: _playing ? 0.0 : 1.0,
+                          duration: const Duration(milliseconds: 300),
+                          child: Container(
+                            width: 56,
+                            height: 56,
+                            decoration: const BoxDecoration(
+                              color: AppColors.sunglow,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.play_arrow_rounded,
+                                color: AppColors.darkPurple, size: 32),
+                          ),
                         ),
-                        child: const Icon(Icons.fullscreen_rounded,
-                            color: Colors.white, size: 20),
                       ),
-                    ),
+                      // Progress bar
+                      Positioned(
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        child: VideoProgressIndicator(
+                          _controller,
+                          allowScrubbing: true,
+                          colors: const VideoProgressColors(
+                            playedColor: AppColors.sunglow,
+                            bufferedColor: Colors.white24,
+                            backgroundColor: Colors.black26,
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                : const Center(
+                    child: CircularProgressIndicator(
+                        color: AppColors.sunglow, strokeWidth: 2),
                   ),
-                ],
-              )
-            : const Center(
-                child: CircularProgressIndicator(
-                    color: AppColors.sunglow, strokeWidth: 2),
+          ),
+        ),
+        // Fullscreen button always on top, outside the tap-to-play zone
+        Positioned(
+          top: 8,
+          right: 8,
+          child: GestureDetector(
+            onTap: _openFullscreen,
+            behavior: HitTestBehavior.opaque,
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.6),
+                borderRadius: BorderRadius.circular(8),
               ),
-      ),
+              child: const Icon(Icons.fullscreen_rounded,
+                  color: Colors.white, size: 22),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
