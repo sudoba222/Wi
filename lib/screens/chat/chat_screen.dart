@@ -50,8 +50,9 @@ class _ChatScreenState extends State<ChatScreen> {
     _controller.addListener(_onTextChanged);
     _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final chatService = Provider.of<ChatService>(context, listen: false);
-      chatService.markMessagesAsRead(widget.conversationId);
+      if (!mounted) return;
+      Provider.of<ChatService>(context, listen: false)
+          .markMessagesAsRead(widget.conversationId);
     });
   }
 
@@ -80,8 +81,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _onScroll() {
     if (!_scrollController.hasClients) return;
-    final atBottom = _scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent - 80;
+    // With reverse:true, pixel 0 is the visual bottom (newest messages)
+    final atBottom = _scrollController.position.pixels <= 80;
     if (atBottom && _showScrollDown) {
       setState(() {
         _showScrollDown = false;
@@ -107,8 +108,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _scrollToBottom() {
     if (_scrollController.hasClients) {
+      // With reverse:true, 0 is the visual bottom (newest messages)
       _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
+        0,
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeOut,
       );
@@ -133,7 +135,9 @@ class _ChatScreenState extends State<ChatScreen> {
           ? null
           : (reply.isSent ? 'You' : widget.otherUserName),
     );
-    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+    // reverse:true list — new messages appear at visual bottom automatically.
+    // Only need to scroll if user had scrolled away.
+    if (_showScrollDown) _scrollToBottom();
   }
 
   void _showChatOptions() {
@@ -347,8 +351,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         dateStr,
                         timeStr,
                       );
-                      WidgetsBinding.instance
-                          .addPostFrameCallback((_) => _scrollToBottom());
+                      if (_showScrollDown) _scrollToBottom();
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.sunglow,
@@ -412,26 +415,26 @@ class _ChatScreenState extends State<ChatScreen> {
                   if (messages.length > _prevMessageCount) {
                     final newCount = messages.length - _prevMessageCount;
                     _prevMessageCount = messages.length;
+                    // With reverse:true, new messages appear at visual bottom automatically.
+                    // Only show badge if user has scrolled away from the bottom.
                     if (_showScrollDown) {
-                      // User is scrolled up — increment badge but don't scroll
                       WidgetsBinding.instance.addPostFrameCallback((_) {
                         if (mounted) {
                           setState(() => _unreadWhileScrolled += newCount);
                         }
                       });
-                    } else {
-                      WidgetsBinding.instance
-                          .addPostFrameCallback((_) => _scrollToBottom());
                     }
                   }
 
                   return ListView.builder(
                     controller: _scrollController,
+                    reverse: true,
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 12),
                     itemCount: messages.length,
                     itemBuilder: (_, i) => _MessageBubble(
-                      message: messages[i],
+                      // reverse: true means index 0 = newest message (visual bottom)
+                      message: messages[messages.length - 1 - i],
                       currentUserId: chatService.currentUserId,
                       otherUserName: widget.otherUserName,
                       onStatusChange: (messageId, status) async {
