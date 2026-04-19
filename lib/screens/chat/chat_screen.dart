@@ -35,6 +35,8 @@ class _ChatScreenState extends State<ChatScreen> {
   final _hasText = ValueNotifier<bool>(false);
   int _prevMessageCount = 0;
   Message? _replyingTo;
+  // Cache stream so rebuilds don't create new Firestore subscriptions
+  late final Stream<List<Message>> _messageStream;
 
   // Scroll-to-bottom button
   bool _showScrollDown = false;
@@ -45,10 +47,11 @@ class _ChatScreenState extends State<ChatScreen> {
     super.initState();
     _controller.addListener(_onTextChanged);
     _scrollController.addListener(_onScroll);
+    final chatService = Provider.of<ChatService>(context, listen: false);
+    _messageStream = chatService.getMessagesStream(widget.conversationId);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      Provider.of<ChatService>(context, listen: false)
-          .markMessagesAsRead(widget.conversationId);
+      chatService.markMessagesAsRead(widget.conversationId);
     });
   }
 
@@ -99,6 +102,17 @@ class _ChatScreenState extends State<ChatScreen> {
     final reply = _replyingTo;
     setState(() => _replyingTo = null);
 
+    // Detect @mention of the other user
+    String? mentionedUserId;
+    final mentionRe = RegExp(r'@(\w+)', caseSensitive: false);
+    for (final m in mentionRe.allMatches(text)) {
+      final word = (m.group(1) ?? '').toLowerCase();
+      if (widget.otherUserName.toLowerCase().split(' ').any((p) => p.startsWith(word))) {
+        mentionedUserId = widget.otherUserId;
+        break;
+      }
+    }
+
     final chatService = Provider.of<ChatService>(context, listen: false);
     await chatService.sendMessage(
       widget.conversationId,
@@ -108,9 +122,9 @@ class _ChatScreenState extends State<ChatScreen> {
       replyToSenderName: reply == null
           ? null
           : (reply.isSent ? 'You' : widget.otherUserName),
+      mentionedUserId: mentionedUserId,
+      otherUserName: widget.otherUserName,
     );
-    // reverse:true list — new messages appear at visual bottom automatically.
-    // Only need to scroll if user had scrolled away.
     if (_showScrollDown) _scrollToBottom();
   }
 
@@ -372,7 +386,7 @@ class _ChatScreenState extends State<ChatScreen> {
               child: Stack(
                 children: [
                   StreamBuilder<List<Message>>(
-                stream: chatService.getMessagesStream(widget.conversationId),
+                stream: _messageStream,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(
@@ -403,33 +417,36 @@ class _ChatScreenState extends State<ChatScreen> {
                   return ListView.builder(
                     controller: _scrollController,
                     reverse: true,
+                    physics: const BouncingScrollPhysics(
+                        parent: AlwaysScrollableScrollPhysics()),
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 12),
                     itemCount: messages.length,
-                    itemBuilder: (_, i) => _MessageBubble(
-                      // reverse: true means index 0 = newest message (visual bottom)
-                      message: messages[messages.length - 1 - i],
-                      currentUserId: chatService.currentUserId,
-                      otherUserName: widget.otherUserName,
-                      onStatusChange: (messageId, status) async {
-                        await chatService.updateMeetingStatus(
+                    itemBuilder: (_, i) {
+                      final msg = messages[messages.length - 1 - i];
+                      return _MessageBubble(
+                        message: msg,
+                        currentUserId: chatService.currentUserId,
+                        otherUserName: widget.otherUserName,
+                        onStatusChange: (messageId, status) async {
+                          await chatService.updateMeetingStatus(
+                            widget.conversationId,
+                            messageId,
+                            status,
+                          );
+                        },
+                        onReact: (emoji) => chatService.toggleReaction(
                           widget.conversationId,
-                          messageId,
-                          status,
-                        );
-                      },
-                      onReact: (emoji) => chatService.toggleReaction(
-                        widget.conversationId,
-                        messages[i].id,
-                        emoji,
-                      ),
-                      onReply: () => setState(
-                          () => _replyingTo = messages[i]),
-                      onDelete: () => chatService.deleteMessage(
-                        widget.conversationId,
-                        messages[i].id,
-                      ),
-                    ),
+                          msg.id,
+                          emoji,
+                        ),
+                        onReply: () => setState(() => _replyingTo = msg),
+                        onDelete: () => chatService.deleteMessage(
+                          widget.conversationId,
+                          msg.id,
+                        ),
+                      );
+                    },
                   );
                 },
               ),
@@ -824,40 +841,39 @@ class _MessageBubble extends StatelessWidget {
                 ),
               ),
             ),
-            // Emoji reaction row
+            // ── Emoji reaction picker ───────────────────────────────
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: emojis.map((e) {
-                  final selected = myReaction == e;
-                  return GestureDetector(
-                    onTap: () {
-                      Navigator.pop(context);
-                      onReact(e);
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      width: 46, height: 46,
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? AppColors.sunglow.withOpacity(0.25)
-                            : Colors.transparent,
-                        shape: BoxShape.circle,
-                        border: selected
-                            ? Border.all(
-                                color: AppColors.sunglow, width: 1.5)
-                            : null,
-                      ),
-                      child: Center(
-                          child: Text(e,
-                              style: const TextStyle(fontSize: 24))),
-                    ),
-                  );
-                }).toList(),
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? Colors.white.withOpacity(0.06)
+                      : AppColors.background,
+                  borderRadius: BorderRadius.circular(28),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: emojis.map((e) {
+                    final selected = myReaction == e;
+                    return _EmojiPickerBtn(
+                      emoji: e,
+                      selected: selected,
+                      isDark: isDark,
+                      onTap: () {
+                        Navigator.pop(context);
+                        onReact(e);
+                      },
+                    );
+                  }).toList(),
+                ),
               ),
             ),
-            const Divider(height: 20),
+            const SizedBox(height: 4),
+            Divider(height: 1, color: isDark
+                ? Colors.white.withOpacity(0.08)
+                : Colors.black.withOpacity(0.06)),
+            const SizedBox(height: 4),
             ListTile(
               leading: Icon(Icons.reply_rounded,
                   color: AppColors.wisteria),
@@ -1024,16 +1040,19 @@ class _MessageBubble extends StatelessWidget {
                     ],
                   ),
                 ),
-                // Reactions row
+                // Reactions row — overlaps bubble bottom by 6px (Telegram style)
                 if (grouped.isNotEmpty)
-                  _ReactionsRow(
-                    grouped: grouped,
-                    myReaction: message.reactions[currentUserId],
-                    isSent: isSent,
-                    isDark: isDark,
-                    onTap: (emoji) => onReact(emoji),
+                  Transform.translate(
+                    offset: const Offset(0, -6),
+                    child: _ReactionsRow(
+                      grouped: grouped,
+                      myReaction: message.reactions[currentUserId],
+                      isSent: isSent,
+                      isDark: isDark,
+                      onTap: (emoji) => onReact(emoji),
+                    ),
                   ),
-                const SizedBox(height: 3),
+                if (grouped.isEmpty) const SizedBox(height: 3),
                 Row(
                   mainAxisAlignment: isSent
                       ? MainAxisAlignment.end
@@ -1177,21 +1196,25 @@ class _ReplyBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 8, 8, 4),
+      padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
       decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(
             color: isDark
-                ? Colors.white.withOpacity(0.1)
-                : Colors.black.withOpacity(0.06),
+                ? Colors.white.withOpacity(0.08)
+                : Colors.black.withOpacity(0.05),
           ),
         ),
       ),
       child: Row(
         children: [
+          // Reply icon
+          Icon(Icons.reply_rounded, color: AppColors.wisteria, size: 20),
+          const SizedBox(width: 8),
+          // Left accent bar
           Container(
             width: 3,
-            height: 36,
+            height: 34,
             decoration: BoxDecoration(
               color: AppColors.wisteria,
               borderRadius: BorderRadius.circular(2),
@@ -1211,6 +1234,7 @@ class _ReplyBar extends StatelessWidget {
                     color: AppColors.wisteria,
                   ),
                 ),
+                const SizedBox(height: 1),
                 Text(
                   text,
                   maxLines: 1,
@@ -1218,21 +1242,32 @@ class _ReplyBar extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 13,
                     color: isDark
-                        ? Colors.white70
-                        : AppColors.darkPurple.withOpacity(0.6),
+                        ? Colors.white60
+                        : AppColors.darkPurple.withOpacity(0.55),
                   ),
                 ),
               ],
             ),
           ),
-          IconButton(
-            onPressed: onCancel,
-            icon: Icon(
-              Icons.close_rounded,
-              size: 18,
-              color: AppColors.mutedText,
+          GestureDetector(
+            onTap: onCancel,
+            child: Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: isDark
+                    ? Colors.white.withOpacity(0.08)
+                    : Colors.black.withOpacity(0.06),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.close_rounded,
+                size: 16,
+                color: AppColors.mutedText,
+              ),
             ),
           ),
+          const SizedBox(width: 4),
         ],
       ),
     );
@@ -1257,42 +1292,53 @@ class _InlineReplyPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bg = isSent
-        ? Colors.black.withOpacity(0.12)
+        ? Colors.black.withOpacity(0.15)
         : (isDark
-            ? Colors.white.withOpacity(0.08)
-            : AppColors.wisteria.withOpacity(0.07));
-    final nameColor =
-        isSent ? AppColors.darkPurple.withOpacity(0.8) : AppColors.wisteria;
+            ? Colors.white.withOpacity(0.1)
+            : AppColors.wisteria.withOpacity(0.09));
+    final accentColor = isSent
+        ? (isDark ? Colors.white70 : AppColors.darkPurple.withOpacity(0.5))
+        : AppColors.wisteria;
+    final nameColor = accentColor;
     final textColor = isSent
         ? AppColors.darkPurple.withOpacity(0.65)
         : (isDark ? Colors.white60 : AppColors.darkPurple.withOpacity(0.55));
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(10, 8, 10, 0),
-      padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+      margin: const EdgeInsets.fromLTRB(8, 8, 8, 0),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(8),
+          topRight: Radius.circular(8),
+          bottomRight: Radius.circular(8),
+        ),
         border: Border(
-          left: BorderSide(color: AppColors.wisteria, width: 2.5),
+          left: BorderSide(color: accentColor, width: 3),
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(senderName,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 6, 10, 6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              senderName,
               style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: nameColor)),
-          const SizedBox(height: 2),
-          Text(
-            text,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 12, color: textColor),
-          ),
-        ],
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: nameColor,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              text,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 13, color: textColor),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1317,50 +1363,198 @@ class _ReactionsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 4),
-      child: Wrap(
-        spacing: 4,
-        children: grouped.entries.map((e) {
-          final isOwn = myReaction == e.key;
-          return GestureDetector(
-            onTap: () => onTap(e.key),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-              decoration: BoxDecoration(
-                color: isOwn
-                    ? AppColors.sunglow.withOpacity(0.25)
-                    : (isDark
-                        ? Colors.white.withOpacity(0.1)
-                        : Colors.black.withOpacity(0.06)),
-                borderRadius: BorderRadius.circular(12),
-                border: isOwn
-                    ? Border.all(
-                        color: AppColors.sunglow.withOpacity(0.6), width: 1)
-                    : null,
+    return Wrap(
+      spacing: 4,
+      runSpacing: 4,
+      children: grouped.entries.map((e) => _ReactionPill(
+        emoji: e.key,
+        count: e.value,
+        isOwn: myReaction == e.key,
+        isDark: isDark,
+        onTap: () => onTap(e.key),
+      )).toList(),
+    );
+  }
+}
+
+class _ReactionPill extends StatefulWidget {
+  final String emoji;
+  final int count;
+  final bool isOwn;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _ReactionPill({
+    required this.emoji,
+    required this.count,
+    required this.isOwn,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  @override
+  State<_ReactionPill> createState() => _ReactionPillState();
+}
+
+class _ReactionPillState extends State<_ReactionPill>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 350));
+    _scale = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: 1.2), weight: 45),
+      TweenSequenceItem(tween: Tween(begin: 1.2, end: 0.88), weight: 25),
+      TweenSequenceItem(tween: Tween(begin: 0.88, end: 1.0), weight: 30),
+    ]).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
+    _ctrl.forward();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _handleTap() {
+    HapticFeedback.lightImpact();
+    _ctrl.forward(from: 0);
+    widget.onTap();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isOwn = widget.isOwn;
+    final isDark = widget.isDark;
+
+    final bgColor = isOwn
+        ? AppColors.wisteria.withOpacity(isDark ? 0.32 : 0.15)
+        : (isDark ? const Color(0xFF2C2C3E) : Colors.white);
+
+    final borderColor = isOwn
+        ? AppColors.wisteria.withOpacity(0.65)
+        : (isDark
+            ? Colors.white.withOpacity(0.1)
+            : Colors.black.withOpacity(0.07));
+
+    final countColor = isOwn
+        ? AppColors.wisteria
+        : (isDark ? Colors.white70 : AppColors.darkPurple.withOpacity(0.65));
+
+    return ScaleTransition(
+      scale: _scale,
+      child: GestureDetector(
+        onTap: _handleTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: borderColor, width: 1.2),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(isDark ? 0.25 : 0.08),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(e.key, style: const TextStyle(fontSize: 13)),
-                  if (e.value > 1) ...[
-                    const SizedBox(width: 3),
-                    Text(
-                      '${e.value}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: isDark
-                            ? Colors.white70
-                            : AppColors.darkPurple.withOpacity(0.7),
-                      ),
-                    ),
-                  ],
-                ],
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(widget.emoji,
+                  style: const TextStyle(fontSize: 16, height: 1.2)),
+              const SizedBox(width: 4),
+              Text(
+                '${widget.count}',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: countColor,
+                  height: 1.2,
+                ),
               ),
-            ),
-          );
-        }).toList(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Emoji picker button (in bottom sheet) ─────────────────────────────────────
+
+class _EmojiPickerBtn extends StatefulWidget {
+  final String emoji;
+  final bool selected;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _EmojiPickerBtn({
+    required this.emoji,
+    required this.selected,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  @override
+  State<_EmojiPickerBtn> createState() => _EmojiPickerBtnState();
+}
+
+class _EmojiPickerBtnState extends State<_EmojiPickerBtn>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 300));
+    _scale = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.4), weight: 40),
+      TweenSequenceItem(tween: Tween(begin: 1.4, end: 0.9), weight: 30),
+      TweenSequenceItem(tween: Tween(begin: 0.9, end: 1.0), weight: 30),
+    ]).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        _ctrl.forward(from: 0).then((_) => widget.onTap());
+      },
+      child: ScaleTransition(
+        scale: _scale,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: widget.selected
+                ? AppColors.wisteria.withOpacity(0.18)
+                : Colors.transparent,
+            border: widget.selected
+                ? Border.all(color: AppColors.wisteria, width: 1.5)
+                : null,
+          ),
+          child: Center(
+            child: Text(widget.emoji,
+                style: const TextStyle(fontSize: 26)),
+          ),
+        ),
       ),
     );
   }

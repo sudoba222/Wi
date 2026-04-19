@@ -116,6 +116,8 @@ class ChatService {
     String? replyToId,
     String? replyToText,
     String? replyToSenderName,
+    String? mentionedUserId,
+    String? otherUserName,
   }) async {
     final messageRef = _firestore
         .collection('conversations')
@@ -144,6 +146,30 @@ class ChatService {
       'lastMessageTime': now,
       if (otherId.isNotEmpty) 'unreadCounts.$otherId': FieldValue.increment(1),
     });
+
+    // Send @mention notification
+    if (mentionedUserId != null && mentionedUserId.isNotEmpty) {
+      try {
+        final senderDoc =
+            await _firestore.collection('users').doc(currentUserId).get();
+        final senderName =
+            senderDoc.data()?['fullName'] ?? senderDoc.data()?['email'] ?? 'Someone';
+        final senderPhoto = senderDoc.data()?['profilePicture'] ?? '';
+        await _firestore
+            .collection('notifications')
+            .doc(mentionedUserId)
+            .collection('items')
+            .add({
+          'type': 'mention',
+          'message': '$senderName mentioned you in a message',
+          'senderName': senderName,
+          'senderPhoto': senderPhoto,
+          'conversationId': conversationId,
+          'read': false,
+          'createdAt': now,
+        });
+      } catch (_) {}
+    }
   }
 
   // Toggle emoji reaction on a message

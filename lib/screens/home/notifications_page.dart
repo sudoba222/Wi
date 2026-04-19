@@ -212,6 +212,7 @@ class _NotificationTile extends StatelessWidget {
       case 'follow': return Icons.person_add_rounded;
       case 'connection': return Icons.handshake_rounded;
       case 'message': return Icons.mail_rounded;
+      case 'mention': return Icons.alternate_email_rounded;
       default: return Icons.notifications_rounded;
     }
   }
@@ -223,6 +224,7 @@ class _NotificationTile extends StatelessWidget {
       case 'follow': return Colors.teal;
       case 'connection': return Colors.blue;
       case 'message': return AppColors.sunglow;
+      case 'mention': return AppColors.wisteria;
       default: return AppColors.wisteria;
     }
   }
