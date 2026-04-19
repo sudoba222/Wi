@@ -13,6 +13,7 @@ import '../profile/profile_page.dart';
 import '../settings/about_page.dart';
 import '../settings/help_support_page.dart';
 import 'feed_page.dart';
+import 'job_page.dart';
 import 'messages_page.dart';
 import 'notifications_page.dart';
 import 'post_page.dart';
