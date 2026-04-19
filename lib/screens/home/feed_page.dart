@@ -83,7 +83,9 @@ class _FeedPageState extends State<FeedPage> {
           _buildHeader(context, isDark),
           Expanded(
             child: StreamBuilder<List<Post>>(
-              stream: _postService.getPostsStream(),
+              stream: currentUser != null
+                  ? _postService.getAlgorithmicFeedStream(currentUser.uid)
+                  : _postService.getPostsStream(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return _buildLoadingState();

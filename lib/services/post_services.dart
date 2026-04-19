@@ -22,6 +22,25 @@ class PostService {
         );
   }
 
+  Stream<List<Post>> getAlgorithmicFeedStream(String currentUserId) {
+    return _firestore
+        .collection('users')
+        .doc(currentUserId)
+        .collection('connections')
+        .snapshots()
+        .asyncMap((connectionsSnap) async {
+          final connectionIds = connectionsSnap.docs.map((d) => d.id).toSet();
+          final postsSnap = await _firestore
+              .collection('posts')
+              .orderBy('timestamp', descending: true)
+              .get();
+          final allPosts = postsSnap.docs.map((doc) => Post.fromFirestore(doc)).toList();
+          final connectionPosts = allPosts.where((p) => connectionIds.contains(p.authorId)).toList();
+          final otherPosts = allPosts.where((p) => !connectionIds.contains(p.authorId)).toList();
+          return [...connectionPosts, ...otherPosts];
+        });
+  }
+
   // Create a new post
   Future<bool> createPost({
   required String content,
