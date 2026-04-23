@@ -3,12 +3,15 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../utils/app_colors.dart';
 import '../../models/post.dart';
+import '../../models/comment.dart';
 import '../../models/user_profile.dart';
 import '../../services/post_services.dart';
 import '../../services/auth_services.dart';
+import '../../services/notification_service.dart';
 import '../../widgets/comments_dialog.dart';
 import '../../providers/language_provider.dart';
 import '../profile/profile_page.dart';
@@ -114,6 +117,7 @@ class _FeedPageState extends State<FeedPage> {
                     itemBuilder: (context, i) {
                       final post = filteredFirestore[i];
                       return _PostCard(
+                        key: ValueKey(post.id),
                         post: post,
                         currentUserId: currentUser?.uid ?? '',
                         postService: _postService,
@@ -153,10 +157,38 @@ class _FeedPageState extends State<FeedPage> {
       ),
       child: Row(
         children: [
-          _HeaderIconBtn(
-            icon: Icons.menu_rounded,
-            isDark: isDark,
-            onTap: () => PageWithDrawerCallback.of(context)?.onOpenDrawer(),
+          StreamBuilder<int>(
+            stream: NotificationService.unreadCountStream(
+                FirebaseAuth.instance.currentUser?.uid ?? ''),
+            builder: (context, snap) {
+              final unread = snap.data ?? 0;
+              return Stack(
+                children: [
+                  _HeaderIconBtn(
+                    icon: Icons.menu_rounded,
+                    isDark: isDark,
+                    onTap: () => PageWithDrawerCallback.of(context)?.onOpenDrawer(),
+                  ),
+                  if (unread > 0)
+                    Positioned(
+                      right: 2,
+                      top: 2,
+                      child: Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: AppColors.sunglow,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isDark ? const Color(0xFF1E0B2C) : AppColors.background,
+                            width: 1.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -326,6 +358,7 @@ class _PostCard extends StatefulWidget {
   final bool isDark;
 
   const _PostCard({
+    super.key,
     required this.post,
     required this.currentUserId,
     required this.postService,
@@ -338,22 +371,59 @@ class _PostCard extends StatefulWidget {
 
 class _PostCardState extends State<_PostCard> {
   bool _likeLoading = false;
+  bool? _optimisticLiked;
 
-  bool get _isLiked => widget.post.isLikedBy(widget.currentUserId);
+  int get _likeCount {
+    final base = widget.post.likedBy.length;
+    if (_optimisticLiked == null) return base;
+    final wasLiked = widget.post.isLikedBy(widget.currentUserId);
+    if (_optimisticLiked == true && !wasLiked) return base + 1;
+    if (_optimisticLiked == false && wasLiked) return base - 1;
+    return base;
+  }
+
+  bool get _isLiked {
+    if (_optimisticLiked != null) return _optimisticLiked!;
+    return widget.post.isLikedBy(widget.currentUserId);
+  }
+
   bool get _isOwn => widget.post.authorId == widget.currentUserId;
 
   Future<void> _toggleLike() async {
     if (_likeLoading || widget.currentUserId.isEmpty) return;
-    setState(() => _likeLoading = true);
+    final wasLiked = _isLiked;
+    setState(() {
+      _optimisticLiked = !wasLiked;
+      _likeLoading = true;
+    });
     try {
       final ref = FirebaseFirestore.instance.collection('posts').doc(widget.post.id);
-      if (_isLiked) {
+      if (wasLiked) {
         await ref.update({'likedBy': FieldValue.arrayRemove([widget.currentUserId])});
       } else {
         await ref.update({'likedBy': FieldValue.arrayUnion([widget.currentUserId])});
+        try {
+          final auth = Provider.of<AuthService>(context, listen: false);
+          final me = await auth.getFullUserProfile(widget.currentUserId);
+          await NotificationService.send(
+            toUserId: widget.post.authorId,
+            type: 'like',
+            message: 'liked your post',
+            senderName: me?.name ?? '',
+            senderPhoto: me?.profilePicture,
+          );
+        } catch (e) {
+          debugPrint('Notification error: $e');
+        }
       }
-    } catch (_) {}
-    if (mounted) setState(() => _likeLoading = false);
+    } catch (e) {
+    }
+    if (mounted) {
+      setState(() {
+        _likeLoading = false;
+        _optimisticLiked = null;
+      });
+    }
   }
 
   void _showComments() {
@@ -647,17 +717,23 @@ class _PostCardState extends State<_PostCard> {
                         icon: _isLiked
                             ? Icons.favorite_rounded
                             : Icons.favorite_border_rounded,
-                        label: post.likedBy.length.toString(),
+                        label: _likeCount.toString(),
                         color:
                             _isLiked ? Colors.redAccent : AppColors.mutedText,
                         onTap: _toggleLike,
                         loading: _likeLoading,
                       ),
-                      _ActionBtn(
-                        icon: Icons.chat_bubble_outline_rounded,
-                        label: post.comments.toString(),
-                        color: AppColors.mutedText,
-                        onTap: _showComments,
+                      StreamBuilder<List<Comment>>(
+                        stream: widget.postService.getCommentsStream(widget.post.id),
+                        builder: (context, snapshot) {
+                          final count = snapshot.data?.length ?? post.comments;
+                          return _ActionBtn(
+                            icon: Icons.chat_bubble_outline_rounded,
+                            label: count.toString(),
+                            color: AppColors.mutedText,
+                            onTap: _showComments,
+                          );
+                        },
                       ),
                       _ActionBtn(
                         icon: Icons.share_outlined,

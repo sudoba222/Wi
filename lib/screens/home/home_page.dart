@@ -7,6 +7,8 @@ import '../../utils/app_colors.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/language_provider.dart';
 import '../../services/auth_services.dart';
+import '../../services/notification_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/user_profile.dart';
 import '../profile/profile_page.dart';
 import '../settings/about_page.dart';
@@ -193,8 +195,32 @@ class _AppDrawer extends StatelessWidget {
 
                   _Div(isDark: isDark),
 
-                  _Tile(icon: Icons.notifications_outlined, label: lang.t('notifications'), textColor: text,
-                    onTap: () async { Navigator.pop(context); await Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsPage())); }),
+                  StreamBuilder<int>(
+                    stream: NotificationService.unreadCountStream(
+                        FirebaseAuth.instance.currentUser?.uid ?? ''),
+                    builder: (context, snap) {
+                      final unread = snap.data ?? 0;
+                      return Stack(
+                        children: [
+                          _Tile(icon: Icons.notifications_outlined, label: lang.t('notifications'), textColor: text,
+                            onTap: () async { Navigator.pop(context); await Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsPage())); }),
+                          if (unread > 0)
+                            Positioned(
+                              right: 18,
+                              top: 18,
+                              child: Container(
+                                width: 10,
+                                height: 10,
+                                decoration: const BoxDecoration(
+                                  color: AppColors.sunglow,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
                   _Tile(icon: Icons.help_outline_rounded, label: lang.t('helpSupport'), textColor: text,
                     onTap: () async { Navigator.pop(context); await Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpSupportPage())); }),
                   _Tile(icon: Icons.info_outline_rounded, label: lang.t('about'), textColor: text,

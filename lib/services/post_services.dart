@@ -4,6 +4,7 @@ import '../models/post.dart';
 import '../models/comment.dart';
 import '../models/user_profile.dart';
 import 'auth_services.dart';
+import 'notification_service.dart';
 // ignore_for_file: avoid_print
 
 class PostService {
@@ -24,16 +25,16 @@ class PostService {
 
   Stream<List<Post>> getAlgorithmicFeedStream(String currentUserId) {
     return _firestore
-        .collection('users')
-        .doc(currentUserId)
-        .collection('connections')
+        .collection('posts')
+        .orderBy('timestamp', descending: true)
         .snapshots()
-        .asyncMap((connectionsSnap) async {
-          final connectionIds = connectionsSnap.docs.map((d) => d.id).toSet();
-          final postsSnap = await _firestore
-              .collection('posts')
-              .orderBy('timestamp', descending: true)
+        .asyncMap((postsSnap) async {
+          final connectionsSnap = await _firestore
+              .collection('users')
+              .doc(currentUserId)
+              .collection('connections')
               .get();
+          final connectionIds = connectionsSnap.docs.map((d) => d.id).toSet();
           final allPosts = postsSnap.docs.map((doc) => Post.fromFirestore(doc)).toList();
           final connectionPosts = allPosts.where((p) => connectionIds.contains(p.authorId)).toList();
           final otherPosts = allPosts.where((p) => !connectionIds.contains(p.authorId)).toList();
@@ -72,6 +73,24 @@ class PostService {
     );
 
     await postRef.set(post.toFirestore());
+    try {
+      final connectionsSnap = await _firestore
+          .collection('users')
+          .doc(currentUser.uid)
+          .collection('connections')
+          .get();
+      for (final doc in connectionsSnap.docs) {
+        await NotificationService.send(
+          toUserId: doc.id,
+          type: 'post',
+          message: 'posted something new',
+          senderName: userProfile.name,
+          senderPhoto: userProfile.profilePicture,
+        );
+      }
+    } catch (e) {
+      print('Error sending post notifications: $e');
+    }
     return true;
   } catch (e) {
     print('Error creating post: $e');

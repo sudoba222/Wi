@@ -12,6 +12,7 @@ import '../../models/experience.dart';
 import '../../models/education.dart';
 import '../../services/auth_services.dart' hide UserProfile;
 import '../../services/cloudinary_service.dart';
+import '../../services/notification_service.dart';
 import 'connections_page.dart';
 import 'followers_page.dart';
 import 'posts_page.dart';
@@ -109,6 +110,18 @@ class _ProfilePageState extends State<ProfilePage> {
           'company': _currentProfile.company,
           'profilePicture': _currentProfile.profilePicture,
         });
+        try {
+          final myData2 = await FirebaseFirestore.instance.collection('users').doc(myUid).get();
+          await NotificationService.send(
+            toUserId: _currentProfile.id,
+            type: 'connection',
+            message: 'connected with you',
+            senderName: myData2.data()?['fullName'] ?? '',
+            senderPhoto: myData2.data()?['profilePicture'],
+          );
+        } catch (e) {
+          debugPrint('Notification error: \$e');
+        }
       }
       if (mounted) setState(() => _isConnected = !_isConnected);
     } finally {
