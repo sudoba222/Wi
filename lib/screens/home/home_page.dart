@@ -8,6 +8,7 @@ import '../../providers/theme_provider.dart';
 import '../../providers/language_provider.dart';
 import '../../services/auth_services.dart';
 import '../../services/notification_service.dart';
+import '../../services/chat_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/user_profile.dart';
 import '../profile/profile_page.dart';

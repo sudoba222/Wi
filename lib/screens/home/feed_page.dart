@@ -13,6 +13,7 @@ import '../../services/post_services.dart';
 import '../../services/auth_services.dart';
 import '../../services/notification_service.dart';
 import '../../widgets/comments_dialog.dart';
+import '../../widgets/fullscreen_image_viewer.dart';
 import '../../providers/language_provider.dart';
 import '../profile/profile_page.dart';
 import 'home_page.dart';
