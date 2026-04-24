@@ -8,6 +8,8 @@ import 'package:provider/provider.dart';
 import '../../utils/app_colors.dart';
 import '../../models/message.dart';
 import '../../services/chat_service.dart';
+import '../../services/auth_services.dart';
+import '../../services/notification_service.dart';
 
 class ChatScreen extends StatefulWidget {
   final String conversationId;
@@ -114,18 +116,21 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     final chatService = Provider.of<ChatService>(context, listen: false);
-    await chatService.sendMessage(
-      widget.conversationId,
-      text,
-      replyToId: reply?.id,
-      replyToText: reply?.text,
-      replyToSenderName: reply == null
-          ? null
-          : (reply.isSent ? 'You' : widget.otherUserName),
-      mentionedUserId: mentionedUserId,
-      otherUserName: widget.otherUserName,
-    );
-    if (_showScrollDown) _scrollToBottom();
+    await chatService.sendMessage(widget.conversationId, text);
+    try {
+      final auth = Provider.of<AuthService>(context, listen: false);
+      final senderProfile = await auth.getFullUserProfile(auth.currentUser!.uid);
+      await NotificationService.send(
+        toUserId: widget.otherUserId,
+        type: 'message',
+        message: 'sent you a message',
+        senderName: senderProfile?.name ?? '',
+        senderPhoto: senderProfile?.profilePicture,
+      );
+    } catch (e) {
+      debugPrint('Notification error: \$e');
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
   }
 
   void _showChatOptions() {

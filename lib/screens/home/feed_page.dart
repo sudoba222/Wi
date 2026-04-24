@@ -3,81 +3,24 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../utils/app_colors.dart';
 import '../../models/post.dart';
+import '../../models/comment.dart';
 import '../../models/user_profile.dart';
 import '../../services/post_services.dart';
 import '../../services/auth_services.dart';
+import '../../services/notification_service.dart';
 import '../../widgets/comments_dialog.dart';
 import '../../providers/language_provider.dart';
 import '../profile/profile_page.dart';
 import 'home_page.dart';
 import 'job_page.dart';
 import '../../widgets/video_player_widget.dart';
-import '../../widgets/fullscreen_image_viewer.dart';
+import 'package:share_plus/share_plus.dart';
 
-// ─── Mock post data ────────────────────────────────────────────────────────────
 
-class _MockPost {
-  final String author;
-  final String role;
-  final String initial;
-  final String content;
-  final String? imageUrl;
-  final int likes;
-  final int comments;
-  final String timeAgo;
-
-  const _MockPost({
-    required this.author,
-    required this.role,
-    required this.initial,
-    required this.content,
-    this.imageUrl,
-    required this.likes,
-    required this.comments,
-    required this.timeAgo,
-  });
-}
-
-const _mockPosts = [
-  _MockPost(
-    author: 'Alisher N.',
-    role: 'Flutter Developer · Alif.tj',
-    initial: 'A',
-    content:
-        'Just shipped a brand-new feature to production — real-time analytics built entirely in Flutter. Six months of late nights, dozens of code reviews, and one very patient team. Watching real users interact with it in the first hour was worth every minute. This is why we build. 🚀 #Flutter #TajikTech #MobileFirst',
-    imageUrl:
-        'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=600&q=80',
-    likes: 42,
-    comments: 8,
-    timeAgo: '1h ago',
-  ),
-  _MockPost(
-    author: 'Nargis R.',
-    role: 'UX Designer · Freelance',
-    initial: 'N',
-    content:
-        'Design systems are not just component libraries — they are a shared language. Spent the last week documenting every spacing decision, typography scale, and interaction pattern in our product. The result: a team that ships faster and a product that looks like one person designed it. #UX #DesignSystem #ProductDesign',
-    imageUrl: null,
-    likes: 28,
-    comments: 5,
-    timeAgo: '3h ago',
-  ),
-  _MockPost(
-    author: 'Rustam K.',
-    role: 'Product Manager · TechHub TJ',
-    initial: 'R',
-    content:
-        'We are hiring! Looking for a senior Flutter developer to join our growing team in Dushanbe. Competitive salary, remote-friendly, and the chance to build products used by thousands across Tajikistan. DM me or apply via the link below. Referrals welcome! 🙌 #Hiring #Flutter #Dushanbe',
-    imageUrl:
-        'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=600&q=80',
-    likes: 67,
-    comments: 14,
-    timeAgo: '6h ago',
-  ),
-];
 
 // ─── Feed Page ────────────────────────────────────────────────────────────────
 
@@ -114,14 +57,7 @@ class _FeedPageState extends State<FeedPage> {
     }
   }
 
-  List<_MockPost> _filterMock(List<_MockPost> posts) {
-    if (_searchQuery.isEmpty) return posts;
-    return posts.where((p) =>
-      p.author.toLowerCase().contains(_searchQuery) ||
-      p.role.toLowerCase().contains(_searchQuery) ||
-      p.content.toLowerCase().contains(_searchQuery)).toList();
-  }
-
+  
   List<Post> _filterFirestore(List<Post> posts) {
     if (_searchQuery.isEmpty) return posts;
     return posts.where((p) =>
@@ -150,16 +86,15 @@ class _FeedPageState extends State<FeedPage> {
           _buildHeader(context, isDark),
           Expanded(
             child: StreamBuilder<List<Post>>(
-              stream: _postService.getPostsStream(),
+              stream: currentUser != null
+                  ? _postService.getAlgorithmicFeedStream(currentUser.uid)
+                  : _postService.getPostsStream(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return _buildLoadingState();
                 }
-                final filteredMock = _filterMock(_mockPosts.toList());
                 final filteredFirestore = _filterFirestore(snapshot.data ?? []);
-                final totalCount = filteredMock.length + filteredFirestore.length;
-
-                if (totalCount == 0 && _searchQuery.isNotEmpty) {
+                if (filteredFirestore.isEmpty && _searchQuery.isNotEmpty) {
                   return Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -172,20 +107,17 @@ class _FeedPageState extends State<FeedPage> {
                     ),
                   );
                 }
-
                 return RefreshIndicator(
                   color: AppColors.wisteria,
                   backgroundColor: isDark ? AppColors.darkCard : AppColors.white,
                   onRefresh: () async => setState(() {}),
                   child: ListView.builder(
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-                    itemCount: totalCount,
+                    itemCount: filteredFirestore.length,
                     itemBuilder: (context, i) {
-                      if (i < filteredMock.length) {
-                        return _MockPostCard(data: filteredMock[i], isDark: isDark);
-                      }
-                      final post = filteredFirestore[i - filteredMock.length];
+                      final post = filteredFirestore[i];
                       return _PostCard(
+                        key: ValueKey(post.id),
                         post: post,
                         currentUserId: currentUser?.uid ?? '',
                         postService: _postService,
@@ -225,10 +157,38 @@ class _FeedPageState extends State<FeedPage> {
       ),
       child: Row(
         children: [
-          _HeaderIconBtn(
-            icon: Icons.menu_rounded,
-            isDark: isDark,
-            onTap: () => PageWithDrawerCallback.of(context)?.onOpenDrawer(),
+          StreamBuilder<int>(
+            stream: NotificationService.unreadCountStream(
+                FirebaseAuth.instance.currentUser?.uid ?? ''),
+            builder: (context, snap) {
+              final unread = snap.data ?? 0;
+              return Stack(
+                children: [
+                  _HeaderIconBtn(
+                    icon: Icons.menu_rounded,
+                    isDark: isDark,
+                    onTap: () => PageWithDrawerCallback.of(context)?.onOpenDrawer(),
+                  ),
+                  if (unread > 0)
+                    Positioned(
+                      right: 2,
+                      top: 2,
+                      child: Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: AppColors.sunglow,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isDark ? const Color(0xFF1E0B2C) : AppColors.background,
+                            width: 1.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -387,187 +347,7 @@ class _HeaderIconBtn extends StatelessWidget {
   }
 }
 
-// ─── Mock Post Card ────────────────────────────────────────────────────────────
 
-class _MockPostCard extends StatefulWidget {
-  final _MockPost data;
-  final bool isDark;
-
-  const _MockPostCard({required this.data, required this.isDark});
-
-  @override
-  State<_MockPostCard> createState() => _MockPostCardState();
-}
-
-class _MockPostCardState extends State<_MockPostCard> {
-  bool _liked = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final d = widget.data;
-    final isDark = widget.isDark;
-    final cardColor = isDark
-        ? Colors.white.withOpacity(0.06)
-        : Colors.white.withOpacity(0.75);
-    final borderColor = isDark
-        ? Colors.white.withOpacity(0.1)
-        : AppColors.wisteria.withOpacity(0.2);
-    final textColor = isDark ? Colors.white : AppColors.darkPurple;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-          child: Container(
-            decoration: BoxDecoration(
-              color: cardColor,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: borderColor, width: 1),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.wisteria.withOpacity(isDark ? 0.04 : 0.08),
-                  blurRadius: 20,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 8, 0),
-                  child: Row(
-                    children: [
-                      _AvatarCircle(
-                          name: d.author, size: 46, fontSize: 18),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              d.author,
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                color: textColor,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              d.role,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: AppColors.mutedText,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 1),
-                            Text(
-                              d.timeAgo,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: AppColors.mutedText,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Icon(Icons.more_horiz_rounded,
-                          color: AppColors.mutedText, size: 20),
-                      const SizedBox(width: 8),
-                    ],
-                  ),
-                ),
-                // Content — expandable caption (Instagram/Telegram style)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-                  child: _ExpandableText(text: d.content, isDark: isDark),
-                ),
-                // Optional image
-                if (d.imageUrl != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 12),
-                    child: GestureDetector(
-                      onTap: () => FullscreenImageViewer.show(
-                          context, [d.imageUrl!]),
-                      child: Image.network(
-                        d.imageUrl!,
-                        width: double.infinity,
-                        height: 220,
-                        fit: BoxFit.cover,
-                        loadingBuilder: (_, child, progress) =>
-                            progress == null
-                                ? child
-                                : Container(
-                                    height: 220,
-                                    color:
-                                        AppColors.wisteria.withOpacity(0.1),
-                                    child: const Center(
-                                      child: CircularProgressIndicator(
-                                          color: AppColors.wisteria,
-                                          strokeWidth: 2),
-                                    ),
-                                  ),
-                        errorBuilder: (_, __, ___) => Container(
-                          height: 160,
-                          color: AppColors.wisteria.withOpacity(0.08),
-                          child: const Center(
-                            child: Icon(Icons.image_outlined,
-                                color: AppColors.wisteria, size: 40),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                const SizedBox(height: 14),
-                // Separator
-                Container(
-                  height: 1,
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  color: AppColors.mutedText.withOpacity(0.12),
-                ),
-                // Actions
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                  child: Row(
-                    children: [
-                      _ActionBtn(
-                        icon: _liked
-                            ? Icons.favorite_rounded
-                            : Icons.favorite_border_rounded,
-                        label: '${d.likes + (_liked ? 1 : 0)}',
-                        color: _liked ? Colors.redAccent : AppColors.mutedText,
-                        onTap: () => setState(() => _liked = !_liked),
-                      ),
-                      _ActionBtn(
-                        icon: Icons.chat_bubble_outline_rounded,
-                        label: '${d.comments}',
-                        color: AppColors.mutedText,
-                        onTap: () {},
-                      ),
-                      _ActionBtn(
-                        icon: Icons.share_outlined,
-                        label: 'Share',
-                        color: AppColors.mutedText,
-                        onTap: () {},
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 // ─── Firestore Post Card ───────────────────────────────────────────────────────
 
@@ -578,6 +358,7 @@ class _PostCard extends StatefulWidget {
   final bool isDark;
 
   const _PostCard({
+    super.key,
     required this.post,
     required this.currentUserId,
     required this.postService,
@@ -590,32 +371,59 @@ class _PostCard extends StatefulWidget {
 
 class _PostCardState extends State<_PostCard> {
   bool _likeLoading = false;
+  bool? _optimisticLiked;
 
-  bool get _isLiked => widget.post.isLikedBy(widget.currentUserId);
+  int get _likeCount {
+    final base = widget.post.likedBy.length;
+    if (_optimisticLiked == null) return base;
+    final wasLiked = widget.post.isLikedBy(widget.currentUserId);
+    if (_optimisticLiked == true && !wasLiked) return base + 1;
+    if (_optimisticLiked == false && wasLiked) return base - 1;
+    return base;
+  }
+
+  bool get _isLiked {
+    if (_optimisticLiked != null) return _optimisticLiked!;
+    return widget.post.isLikedBy(widget.currentUserId);
+  }
+
   bool get _isOwn => widget.post.authorId == widget.currentUserId;
 
   Future<void> _toggleLike() async {
     if (_likeLoading || widget.currentUserId.isEmpty) return;
-    setState(() => _likeLoading = true);
+    final wasLiked = _isLiked;
+    setState(() {
+      _optimisticLiked = !wasLiked;
+      _likeLoading = true;
+    });
     try {
       final ref = FirebaseFirestore.instance.collection('posts').doc(widget.post.id);
-      if (_isLiked) {
+      if (wasLiked) {
         await ref.update({'likedBy': FieldValue.arrayRemove([widget.currentUserId])});
       } else {
         await ref.update({'likedBy': FieldValue.arrayUnion([widget.currentUserId])});
+        try {
+          final auth = Provider.of<AuthService>(context, listen: false);
+          final me = await auth.getFullUserProfile(widget.currentUserId);
+          await NotificationService.send(
+            toUserId: widget.post.authorId,
+            type: 'like',
+            message: 'liked your post',
+            senderName: me?.name ?? '',
+            senderPhoto: me?.profilePicture,
+          );
+        } catch (e) {
+          debugPrint('Notification error: $e');
+        }
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Could not update like: ${e.toString()}'),
-            backgroundColor: Colors.redAccent,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
     }
-    if (mounted) setState(() => _likeLoading = false);
+    if (mounted) {
+      setState(() {
+        _likeLoading = false;
+        _optimisticLiked = null;
+      });
+    }
   }
 
   void _showComments() {
@@ -908,23 +716,32 @@ class _PostCardState extends State<_PostCard> {
                         icon: _isLiked
                             ? Icons.favorite_rounded
                             : Icons.favorite_border_rounded,
-                        label: post.likedBy.length.toString(),
+                        label: _likeCount.toString(),
                         color:
                             _isLiked ? Colors.redAccent : AppColors.mutedText,
                         onTap: _toggleLike,
                         loading: _likeLoading,
                       ),
-                      _ActionBtn(
-                        icon: Icons.chat_bubble_outline_rounded,
-                        label: post.comments.toString(),
-                        color: AppColors.mutedText,
-                        onTap: _showComments,
+                      StreamBuilder<List<Comment>>(
+                        stream: widget.postService.getCommentsStream(widget.post.id),
+                        builder: (context, snapshot) {
+                          final count = snapshot.data?.length ?? post.comments;
+                          return _ActionBtn(
+                            icon: Icons.chat_bubble_outline_rounded,
+                            label: count.toString(),
+                            color: AppColors.mutedText,
+                            onTap: _showComments,
+                          );
+                        },
                       ),
                       _ActionBtn(
                         icon: Icons.share_outlined,
                         label: 'Share',
                         color: AppColors.mutedText,
-                        onTap: () {},
+                          onTap: () async {
+                          final text = '${post.author} on Wi:\n\n${post.content}\n\nDownload Wi app!';
+                          await Share.share(text);
+                        },
                       ),
                     ],
                   ),

@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/post.dart';
 import '../models/comment.dart';
 import 'auth_services.dart';
+import 'notification_service.dart';
 // ignore_for_file: avoid_print
 
 class PostService {
@@ -19,6 +20,25 @@ class PostService {
           (snapshot) =>
               snapshot.docs.map((doc) => Post.fromFirestore(doc)).toList(),
         );
+  }
+
+  Stream<List<Post>> getAlgorithmicFeedStream(String currentUserId) {
+    return _firestore
+        .collection('posts')
+        .orderBy('timestamp', descending: true)
+        .snapshots()
+        .asyncMap((postsSnap) async {
+          final connectionsSnap = await _firestore
+              .collection('users')
+              .doc(currentUserId)
+              .collection('connections')
+              .get();
+          final connectionIds = connectionsSnap.docs.map((d) => d.id).toSet();
+          final allPosts = postsSnap.docs.map((doc) => Post.fromFirestore(doc)).toList();
+          final connectionPosts = allPosts.where((p) => connectionIds.contains(p.authorId)).toList();
+          final otherPosts = allPosts.where((p) => !connectionIds.contains(p.authorId)).toList();
+          return [...connectionPosts, ...otherPosts];
+        });
   }
 
   // Create a new post
@@ -53,35 +73,30 @@ class PostService {
         taggedUserNames: taggedUserNames,
       );
 
-      await postRef.set(post.toFirestore());
-
-      // Send tag notifications
-      final now = Timestamp.now();
-      for (int i = 0; i < taggedUsers.length; i++) {
-        final uid = taggedUsers[i];
-        if (uid == currentUser.uid) continue;
-        try {
-          await _firestore
-              .collection('notifications')
-              .doc(uid)
-              .collection('items')
-              .add({
-            'type': 'tag',
-            'message': '${userProfile.name} tagged you in a post',
-            'senderName': userProfile.name,
-            'senderPhoto': userProfile.profilePicture,
-            'postId': postRef.id,
-            'read': false,
-            'createdAt': now,
-          });
-        } catch (_) {}
+    await postRef.set(post.toFirestore());
+    try {
+      final connectionsSnap = await _firestore
+          .collection('users')
+          .doc(currentUser.uid)
+          .collection('connections')
+          .get();
+      for (final doc in connectionsSnap.docs) {
+        await NotificationService.send(
+          toUserId: doc.id,
+          type: 'post',
+          message: 'posted something new',
+          senderName: userProfile.name,
+          senderPhoto: userProfile.profilePicture,
+        );
       }
-
-      return true;
     } catch (e) {
-      print('Error creating post: $e');
-      return false;
+      print('Error sending post notifications: $e');
     }
+    return true;
+  } catch (e) {
+    print('Error creating post: $e');
+    return false;
+  }
   }
   // Toggle like on a post
   Future<bool> toggleLike(String postId) async {

@@ -7,6 +7,7 @@ import '../models/post.dart';
 import '../models/comment.dart';
 import '../services/post_services.dart';
 import '../services/auth_services.dart';
+import '../services/notification_service.dart';
 import '../utils/app_colors.dart';
 
 /// Beautiful bottom-sheet style comments panel with glassmorphism cards,
@@ -33,6 +34,23 @@ class _CommentsDialogState extends State<CommentsDialog> {
     if (text.isEmpty) return;
     setState(() => _posting = true);
     final ok = await _postService.addComment(widget.post.id, text);
+    if (ok) {
+      try {
+        final auth = Provider.of<AuthService>(context, listen: false);
+        final me = auth.currentUser != null
+            ? await auth.getFullUserProfile(auth.currentUser!.uid)
+            : null;
+        await NotificationService.send(
+          toUserId: widget.post.authorId,
+          type: 'comment',
+          message: 'commented on your post',
+          senderName: me?.name ?? '',
+          senderPhoto: me?.profilePicture,
+        );
+      } catch (e) {
+        debugPrint('Notification error: $e');
+      }
+    }
     if (mounted) setState(() => _posting = false);
     if (ok) {
       _controller.clear();
