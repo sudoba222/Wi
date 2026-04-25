@@ -93,9 +93,93 @@ class JobPosting {
   int get rejectedCount => applicants.where((a) => a.status == 'rejected').length;
 }
 
+// ─── Job Seeker Profile ───────────────────────────────────────────────────────
+// Collected during onboarding; stored in-session. Used to pre-fill Easy Apply.
+
+class JobSeekerProfile {
+  String phone;
+  String location;
+  String summary;
+  String linkedIn;
+  String portfolioUrl;
+  String cvFileName;
+  String cvUploadedAt;
+  bool cvUploaded;
+  bool setupComplete;
+
+  JobSeekerProfile({
+    this.phone = '',
+    this.location = '',
+    this.summary = '',
+    this.linkedIn = '',
+    this.portfolioUrl = '',
+    this.cvFileName = '',
+    this.cvUploadedAt = '',
+    this.cvUploaded = false,
+    this.setupComplete = false,
+  });
+
+  int get completionPct {
+    int pts = 0;
+    if (phone.isNotEmpty) pts += 25;
+    if (location.isNotEmpty) pts += 20;
+    if (summary.isNotEmpty) pts += 25;
+    if (cvUploaded) pts += 30;
+    return pts;
+  }
+}
+
+// ─── Company Profile ─────────────────────────────────────────────────────────
+// Collected during employer onboarding; editable afterwards.
+
+class CompanyProfile {
+  String name;
+  String industry;
+  String size;       // '1–10', '11–50', '51–200', '201–500', '500+'
+  String location;
+  String website;
+  String description;
+  int logoColor;
+  String logoInitial;
+  bool setupComplete;
+
+  CompanyProfile({
+    this.name = '',
+    this.industry = '',
+    this.size = '',
+    this.location = '',
+    this.website = '',
+    this.description = '',
+    this.logoColor = 0xFF6C5CE7,
+    this.logoInitial = '',
+    this.setupComplete = false,
+  });
+
+  int get completionPct {
+    int pts = 0;
+    if (name.isNotEmpty) pts += 20;
+    if (industry.isNotEmpty) pts += 20;
+    if (size.isNotEmpty) pts += 15;
+    if (location.isNotEmpty) pts += 15;
+    if (website.isNotEmpty) pts += 10;
+    if (description.isNotEmpty) pts += 20;
+    return pts;
+  }
+}
+
+// ─── Central Store ───────────────────────────────────────────────────────────
+
 class JobsStore {
-  static String companyName = 'Your Company';
-  static String companyIndustry = 'Technology';
+  static final JobSeekerProfile seekerProfile = JobSeekerProfile();
+  static final CompanyProfile companyProfile = CompanyProfile(
+    name: '',
+    logoInitial: '',
+    logoColor: 0xFF6C5CE7,
+  );
+
+  // Keep companyName in sync with companyProfile.name for legacy refs.
+  static String get companyName => companyProfile.name.isNotEmpty ? companyProfile.name : 'Your Company';
+  static String get companyIndustry => companyProfile.industry.isNotEmpty ? companyProfile.industry : 'Technology';
 
   static final List<AppEntry> seekerApplications = [];
 
@@ -255,7 +339,7 @@ class JobsStore {
       description:
           'We are looking for an experienced Flutter developer to build high-quality '
           'cross-platform mobile applications. You will work closely with our product and '
-          'design teams to deliver exceptional user experiences for Tajikistan\'s fastest-growing platform.',
+          'design teams to deliver exceptional user experiences.',
       requirements: [
         '2+ years Flutter / Dart experience',
         'Firebase or REST API integration',

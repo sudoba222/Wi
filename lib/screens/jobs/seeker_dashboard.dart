@@ -7,6 +7,7 @@ import '../../utils/app_colors.dart';
 import '../../models/user_profile.dart';
 import 'job_store.dart';
 import 'job_widgets.dart';
+import 'job_profile_sheet.dart';
 
 class SeekerDashboard extends StatefulWidget {
   final UserProfile? userProfile;
@@ -47,31 +48,47 @@ class _SeekerDashboardState extends State<SeekerDashboard>
     super.dispose();
   }
 
-  // ── Profile strength ──
+  // ── Profile strength (combines UserProfile + JobSeekerProfile) ──
 
   int get _profileStrength {
     final p = widget.userProfile;
-    if (p == null) return 10;
+    final sp = JobsStore.seekerProfile;
     int score = 0;
-    if (p.name.isNotEmpty) score += 15;
-    if (p.jobTitle.isNotEmpty) score += 15;
-    if (p.company.isNotEmpty) score += 10;
-    if (p.bio.isNotEmpty) score += 20;
-    if (p.skills.isNotEmpty) score += 20;
-    if (p.experience.isNotEmpty) score += 20;
-    return score.clamp(10, 100);
+    if (p != null) {
+      if (p.name.isNotEmpty) score += 12;
+      if (p.jobTitle.isNotEmpty) score += 12;
+      if (p.company.isNotEmpty) score += 8;
+      if (p.bio.isNotEmpty || sp.summary.isNotEmpty) score += 14;
+      if (p.skills.isNotEmpty) score += 14;
+      if (p.experience.isNotEmpty) score += 10;
+    }
+    if (sp.phone.isNotEmpty) score += 10;
+    if (sp.location.isNotEmpty) score += 10;
+    if (sp.cvUploaded) score += 10;
+    return score.clamp(5, 100);
   }
 
   List<(String, bool)> get _strengthChecklist {
     final p = widget.userProfile;
+    final sp = JobsStore.seekerProfile;
     return [
       ('Full name', p?.name.isNotEmpty ?? false),
       ('Job title', p?.jobTitle.isNotEmpty ?? false),
-      ('Company', p?.company.isNotEmpty ?? false),
-      ('Bio / summary', p?.bio.isNotEmpty ?? false),
+      ('Bio / summary', (p?.bio.isNotEmpty ?? false) || sp.summary.isNotEmpty),
+      ('Phone number', sp.phone.isNotEmpty),
+      ('Location', sp.location.isNotEmpty),
       ('Skills added', p?.skills.isNotEmpty ?? false),
-      ('Work experience', p?.experience.isNotEmpty ?? false),
+      ('CV uploaded', sp.cvUploaded),
     ];
+  }
+
+  void _openJobProfile() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => JobProfileSheet(userProfile: widget.userProfile),
+    ).then((_) => setState(() {}));
   }
 
   // ── Job match ──
@@ -205,6 +222,20 @@ class _SeekerDashboardState extends State<SeekerDashboard>
                         ],
                       ),
                     ),
+                    // Edit job profile
+                    GestureDetector(
+                      onTap: _openJobProfile,
+                      child: Container(
+                        width: 40, height: 40,
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.8),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.mutedText.withOpacity(0.15)),
+                        ),
+                        child: Icon(Icons.person_outline_rounded, color: textColor, size: 18),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     // Applied badge
                     GestureDetector(
                       onTap: () => _tabController.animateTo(3),

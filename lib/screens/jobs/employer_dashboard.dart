@@ -16,18 +16,8 @@ class EmployerDashboard extends StatefulWidget {
 }
 
 class _EmployerDashboardState extends State<EmployerDashboard> {
-  bool _editingName = false;
-  final _nameController = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    _nameController.text = JobsStore.companyName;
-  }
-
   @override
   void dispose() {
-    _nameController.dispose();
     super.dispose();
   }
 
@@ -219,104 +209,115 @@ class _EmployerDashboardState extends State<EmployerDashboard> {
     );
   }
 
+  void _openCompanyProfile() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _CompanyProfileSheet(onSaved: () => setState(() {})),
+    );
+  }
+
   Widget _buildCompanyCard(bool isDark, Color textColor) {
+    final cp = JobsStore.companyProfile;
+    final logoColor = Color(cp.logoColor);
+    final initial = cp.logoInitial.isNotEmpty ? cp.logoInitial : (cp.name.isNotEmpty ? cp.name[0].toUpperCase() : 'C');
+    final completion = cp.completionPct;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-          child: Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: isDark
-                    ? [AppColors.darkCard, AppColors.darkCard.withOpacity(0.8)]
-                    : [Colors.white, Colors.white.withOpacity(0.9)],
+      child: GestureDetector(
+        onTap: _openCompanyProfile,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+            child: Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.darkCard : Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                    color: isDark ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.6)),
+                boxShadow: [BoxShadow(
+                    color: AppColors.wisteria.withOpacity(0.06), blurRadius: 16, offset: const Offset(0, 4))],
               ),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                  color: isDark ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.6)),
-              boxShadow: [
-                BoxShadow(
-                    color: AppColors.wisteria.withOpacity(0.06),
-                    blurRadius: 16,
-                    offset: const Offset(0, 4))
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 56, height: 56,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                        colors: [AppColors.splashPurple, AppColors.wisteria]),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Center(
-                    child: Text(
-                      JobsStore.companyName.isNotEmpty ? JobsStore.companyName[0].toUpperCase() : 'C',
-                      style: const TextStyle(
-                          color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _editingName
-                      ? TextField(
-                          controller: _nameController,
-                          autofocus: true,
-                          style: TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.w800, color: textColor),
-                          decoration: InputDecoration(
-                            hintText: 'Company name',
-                            border: InputBorder.none,
-                            suffixIcon: GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  JobsStore.companyName = _nameController.text.trim().isNotEmpty
-                                      ? _nameController.text.trim()
-                                      : 'Your Company';
-                                  _editingName = false;
-                                });
-                              },
-                              child: const Icon(Icons.check_rounded,
-                                  color: Color(0xFF10B981), size: 20),
-                            ),
-                          ),
-                          onSubmitted: (v) {
-                            setState(() {
-                              JobsStore.companyName = v.trim().isNotEmpty ? v.trim() : 'Your Company';
-                              _editingName = false;
-                            });
-                          },
-                        )
-                      : Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(JobsStore.companyName,
-                                      style: TextStyle(
-                                          fontSize: 18, fontWeight: FontWeight.w800, color: textColor)),
-                                ),
-                                GestureDetector(
-                                  onTap: () => setState(() => _editingName = true),
-                                  child: const Icon(Icons.edit_outlined,
-                                      size: 16, color: AppColors.mutedText),
-                                ),
-                              ],
-                            ),
-                            Text(JobsStore.companyIndustry,
-                                style: const TextStyle(fontSize: 13, color: AppColors.mutedText)),
-                          ],
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      // Logo
+                      Container(
+                        width: 56, height: 56,
+                        decoration: BoxDecoration(color: logoColor, borderRadius: BorderRadius.circular(16)),
+                        child: Center(child: Text(initial,
+                            style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800))),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(JobsStore.companyName,
+                              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: textColor)),
+                          Row(children: [
+                            if (cp.industry.isNotEmpty)
+                              Text(cp.industry,
+                                  style: const TextStyle(fontSize: 13, color: AppColors.mutedText)),
+                            if (cp.industry.isNotEmpty && cp.size.isNotEmpty)
+                              const Text(' · ', style: TextStyle(fontSize: 13, color: AppColors.mutedText)),
+                            if (cp.size.isNotEmpty)
+                              Text('${cp.size} employees',
+                                  style: const TextStyle(fontSize: 13, color: AppColors.mutedText)),
+                          ]),
+                        ],
+                      )),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white.withOpacity(0.06) : AppColors.background,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppColors.mutedText.withOpacity(0.15)),
                         ),
-                ),
-              ],
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          const Icon(Icons.edit_outlined, size: 13, color: AppColors.mutedText),
+                          const SizedBox(width: 4),
+                          const Text('Edit', style: TextStyle(fontSize: 12, color: AppColors.mutedText, fontWeight: FontWeight.w600)),
+                        ]),
+                      ),
+                    ],
+                  ),
+                  if (cp.description.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Text(cp.description,
+                        maxLines: 2, overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 13, color: AppColors.mutedText, height: 1.5)),
+                  ],
+                  // Profile completeness bar
+                  const SizedBox(height: 14),
+                  Row(children: [
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('Profile $completion% complete',
+                          style: const TextStyle(fontSize: 11, color: AppColors.mutedText)),
+                      const SizedBox(height: 4),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(3),
+                        child: LinearProgressIndicator(
+                          value: completion / 100,
+                          minHeight: 4,
+                          backgroundColor: AppColors.mutedText.withOpacity(0.15),
+                          valueColor: AlwaysStoppedAnimation(
+                            completion >= 80 ? const Color(0xFF10B981) : AppColors.sunglow,
+                          ),
+                        ),
+                      ),
+                    ])),
+                    const SizedBox(width: 12),
+                    if (completion < 100)
+                      Text('${100 - completion}% left',
+                          style: const TextStyle(fontSize: 11, color: AppColors.mutedText)),
+                  ]),
+                ],
+              ),
             ),
           ),
         ),
@@ -838,3 +839,334 @@ class _SmallActionBtn extends StatelessWidget {
         ),
       );
 }
+
+// ════════════════════════════════════════════════════════════
+//  COMPANY PROFILE SHEET
+// ════════════════════════════════════════════════════════════
+
+class _CompanyProfileSheet extends StatefulWidget {
+  final VoidCallback onSaved;
+  const _CompanyProfileSheet({required this.onSaved});
+
+  @override
+  State<_CompanyProfileSheet> createState() => _CompanyProfileSheetState();
+}
+
+class _CompanyProfileSheetState extends State<_CompanyProfileSheet> {
+  late final TextEditingController _nameCtrl;
+  late final TextEditingController _locationCtrl;
+  late final TextEditingController _websiteCtrl;
+  late final TextEditingController _descCtrl;
+  late String _industry;
+  late String _size;
+  late int _logoColor;
+  bool _saved = false;
+
+  static const _industries = [
+    'Technology', 'Finance', 'Healthcare', 'Education',
+    'Retail', 'Manufacturing', 'Media', 'Other',
+  ];
+  static const _sizes = ['1–10', '11–50', '51–200', '201–500', '500+'];
+  static const _logoColors = [
+    0xFF6C5CE7, 0xFF00B894, 0xFF0984E3, 0xFFFFD166,
+    0xFFE84393, 0xFFE17055, 0xFF74B9FF, 0xFF210B2C,
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    final cp = JobsStore.companyProfile;
+    _nameCtrl    = TextEditingController(text: cp.name);
+    _locationCtrl = TextEditingController(text: cp.location);
+    _websiteCtrl = TextEditingController(text: cp.website);
+    _descCtrl    = TextEditingController(text: cp.description);
+    _industry    = cp.industry;
+    _size        = cp.size;
+    _logoColor   = cp.logoColor;
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _locationCtrl.dispose();
+    _websiteCtrl.dispose();
+    _descCtrl.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    HapticFeedback.lightImpact();
+    final cp = JobsStore.companyProfile;
+    final name = _nameCtrl.text.trim().isNotEmpty ? _nameCtrl.text.trim() : 'Your Company';
+    cp.name        = name;
+    cp.logoInitial = name[0].toUpperCase();
+    cp.location    = _locationCtrl.text.trim();
+    cp.website     = _websiteCtrl.text.trim();
+    cp.description = _descCtrl.text.trim();
+    cp.industry    = _industry;
+    cp.size        = _size;
+    cp.logoColor   = _logoColor;
+    cp.setupComplete = true;
+    setState(() => _saved = true);
+    widget.onSaved();
+    Future.delayed(const Duration(milliseconds: 1200), () {
+      if (mounted) Navigator.pop(context);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? AppColors.darkCard.withOpacity(0.98) : Colors.white.withOpacity(0.98);
+    final textColor = isDark ? Colors.white : AppColors.darkPurple;
+
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          height: MediaQuery.of(context).size.height * 0.92,
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                width: 36, height: 4,
+                margin: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: AppColors.mutedText.withOpacity(0.3), borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                child: Row(children: [
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('Company Profile', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: textColor)),
+                    const Text('Shown to candidates on all job listings', style: TextStyle(fontSize: 13, color: AppColors.mutedText)),
+                  ])),
+                ]),
+              ),
+              Divider(height: 1, color: AppColors.mutedText.withOpacity(0.1)),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Logo color picker
+                      _Label('Company Logo Color', textColor),
+                      const SizedBox(height: 10),
+                      Row(children: [
+                        // Preview
+                        Container(
+                          width: 56, height: 56,
+                          decoration: BoxDecoration(
+                            color: Color(_logoColor), borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Center(child: Text(
+                            _nameCtrl.text.isNotEmpty ? _nameCtrl.text[0].toUpperCase() : 'C',
+                            style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800),
+                          )),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(child: Wrap(spacing: 8, runSpacing: 8,
+                          children: _logoColors.map((c) {
+                            final isSel = _logoColor == c;
+                            return GestureDetector(
+                              onTap: () => setState(() => _logoColor = c),
+                              child: Container(
+                                width: 32, height: 32,
+                                decoration: BoxDecoration(
+                                  color: Color(c), shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: isSel ? Colors.white : Colors.transparent, width: 2.5,
+                                  ),
+                                  boxShadow: isSel ? [BoxShadow(color: Color(c).withOpacity(0.4), blurRadius: 6)] : [],
+                                ),
+                                child: isSel ? const Icon(Icons.check_rounded, color: Colors.white, size: 16) : null,
+                              ),
+                            );
+                          }).toList(),
+                        )),
+                      ]),
+                      const SizedBox(height: 22),
+                      _Label('Company Name', textColor),
+                      const SizedBox(height: 8),
+                      _Field(
+                        controller: _nameCtrl,
+                        hint: 'e.g. Alif Tech',
+                        icon: Icons.business_outlined,
+                        isDark: isDark,
+                        onChanged: (_) => setState(() {}),
+                      ),
+                      const SizedBox(height: 16),
+                      _Label('Industry', textColor),
+                      const SizedBox(height: 10),
+                      Wrap(spacing: 8, runSpacing: 8,
+                        children: _industries.map((ind) {
+                          final isSel = _industry == ind;
+                          return GestureDetector(
+                            onTap: () => setState(() => _industry = ind),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 150),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: isSel ? AppColors.darkPurple : (isDark ? Colors.white.withOpacity(0.07) : Colors.white),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: isSel ? AppColors.sunglow.withOpacity(0.5) : AppColors.mutedText.withOpacity(0.2),
+                                ),
+                              ),
+                              child: Text(ind, style: TextStyle(
+                                  fontSize: 13, fontWeight: FontWeight.w600,
+                                  color: isSel ? Colors.white : textColor)),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 16),
+                      _Label('Company Size', textColor),
+                      const SizedBox(height: 10),
+                      Row(children: _sizes.map((s) {
+                        final isSel = _size == s;
+                        return Expanded(child: GestureDetector(
+                          onTap: () => setState(() => _size = s),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            margin: const EdgeInsets.only(right: 6),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: isSel ? AppColors.darkPurple : (isDark ? Colors.white.withOpacity(0.07) : Colors.white),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: isSel ? AppColors.sunglow.withOpacity(0.5) : AppColors.mutedText.withOpacity(0.2),
+                              ),
+                            ),
+                            child: Center(child: Text(s, style: TextStyle(
+                                fontSize: 11, fontWeight: FontWeight.w600,
+                                color: isSel ? Colors.white : textColor))),
+                          ),
+                        ));
+                      }).toList()),
+                      const SizedBox(height: 16),
+                      _Label('Location', textColor),
+                      const SizedBox(height: 8),
+                      _Field(controller: _locationCtrl, hint: 'e.g. Dushanbe, Tajikistan',
+                          icon: Icons.location_on_outlined, isDark: isDark),
+                      const SizedBox(height: 16),
+                      _Label('Website', textColor),
+                      const SizedBox(height: 8),
+                      _Field(controller: _websiteCtrl, hint: 'https://yourcompany.com',
+                          icon: Icons.language_rounded, isDark: isDark),
+                      const SizedBox(height: 16),
+                      _Label('About the company', textColor),
+                      const SizedBox(height: 8),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white.withOpacity(0.06) : Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.mutedText.withOpacity(0.15)),
+                        ),
+                        child: TextField(
+                          controller: _descCtrl,
+                          maxLines: 4, maxLength: 400,
+                          style: TextStyle(fontSize: 14, color: textColor),
+                          decoration: InputDecoration(
+                            hintText: 'What does your company do? What\'s the culture like?',
+                            hintStyle: TextStyle(fontSize: 13, color: AppColors.mutedText.withOpacity(0.6)),
+                            contentPadding: const EdgeInsets.all(14),
+                            border: InputBorder.none,
+                            counterStyle: const TextStyle(fontSize: 11, color: AppColors.mutedText),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 100),
+                    ],
+                  ),
+                ),
+              ),
+              // Save button
+              Container(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+                decoration: BoxDecoration(
+                  color: bg,
+                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 12, offset: const Offset(0, -4))],
+                ),
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: _saved
+                      ? Container(
+                          key: const ValueKey('saved'),
+                          height: 52,
+                          decoration: BoxDecoration(color: const Color(0xFF10B981), borderRadius: BorderRadius.circular(16)),
+                          child: const Center(child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            Icon(Icons.check_rounded, color: Colors.white, size: 20),
+                            SizedBox(width: 8),
+                            Text('Profile saved!', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
+                          ])),
+                        )
+                      : SizedBox(
+                          key: const ValueKey('save'),
+                          width: double.infinity, height: 52,
+                          child: ElevatedButton(
+                            onPressed: _save,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.sunglow,
+                              foregroundColor: AppColors.darkPurple,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              elevation: 0,
+                            ),
+                            child: const Text('Save Company Profile', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                          ),
+                        ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Label extends StatelessWidget {
+  final String text;
+  final Color color;
+  const _Label(this.text, this.color);
+  @override
+  Widget build(BuildContext context) => Text(text,
+    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: color.withOpacity(0.7)));
+}
+
+class _Field extends StatelessWidget {
+  final TextEditingController controller;
+  final String hint;
+  final IconData icon;
+  final bool isDark;
+  final ValueChanged<String>? onChanged;
+  const _Field({required this.controller, required this.hint, required this.icon, required this.isDark, this.onChanged});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    decoration: BoxDecoration(
+      color: isDark ? Colors.white.withOpacity(0.07) : Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: AppColors.mutedText.withOpacity(0.15)),
+    ),
+    child: TextField(
+      controller: controller,
+      onChanged: onChanged,
+      style: TextStyle(fontSize: 14, color: isDark ? Colors.white : AppColors.darkPurple),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: TextStyle(fontSize: 13, color: AppColors.mutedText.withOpacity(0.5)),
+        prefixIcon: Icon(icon, size: 18, color: AppColors.wisteria),
+        border: InputBorder.none,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      ),
+    ),
+  );
+}
+
