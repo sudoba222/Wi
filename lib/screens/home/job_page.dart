@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../utils/app_colors.dart';
 import '../../models/user_profile.dart';
 import '../../services/auth_services.dart';
@@ -22,12 +23,20 @@ class JobPage extends StatefulWidget {
 }
 
 class _JobPageState extends State<JobPage> {
-  // ── Onboarding state (static → persists across tab switches) ──────────────
+  // ── Onboarding state (static → persists across tab switches in a session) ─
   static bool _done = false;
   static String _role = '';
   static String _category = '';
   static String _workStyle = '';
   static String _experience = '';
+  static bool _cvSimulated = false;
+
+  // ── Per-UID cache: prevents re-asking the same user after logout/login ─────
+  // Resets automatically when a different UID logs in.
+  static String? _lastLoadedUid;
+
+  // ── Loading state: shown while we check Firestore for saved prefs ──────────
+  bool _loadingPrefs = true;
 
   final _pageController = PageController();
   int _step = 0;
@@ -36,7 +45,6 @@ class _JobPageState extends State<JobPage> {
   final _phoneController = TextEditingController();
   final _locationController = TextEditingController();
   final _summaryController = TextEditingController();
-  static bool _cvSimulated = false; // simulates a CV pick
 
   // ── Employer extra step ───────────────────────────────────────────────────
   final _companyNameController = TextEditingController();
@@ -55,7 +63,77 @@ class _JobPageState extends State<JobPage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadProfile());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadJobPrefs();   // determines whether to show onboarding or dashboard
+      _loadProfile();    // loads UserProfile in parallel
+    });
+  }
+
+  // ── Load saved job preferences from Firestore ─────────────────────────────
+  // This is the key to remembering a user's choices across logout/app-restart.
+  Future<void> _loadJobPrefs() async {
+    final auth = Provider.of<AuthService>(context, listen: false);
+    final uid = auth.currentUser?.uid;
+
+    if (uid == null) {
+      // Not logged in — reset everything and show onboarding
+      _done = false;
+      if (mounted) setState(() => _loadingPrefs = false);
+      return;
+    }
+
+    // Same UID already loaded this session → use cached static state, no Firestore needed
+    if (_lastLoadedUid == uid) {
+      if (mounted) setState(() => _loadingPrefs = false);
+      return;
+    }
+
+    // New UID (different user or first launch): reset in-memory state first
+    _done = false;
+    _role = '';
+    _category = '';
+    _workStyle = '';
+    _experience = '';
+    _cvSimulated = false;
+
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .get();
+      final data = doc.data() ?? {};
+
+      if (data['jobOnboardingDone'] == true) {
+        _done       = true;
+        _role       = data['jobRole']       as String? ?? '';
+        _category   = data['jobCategory']   as String? ?? '';
+        _workStyle  = data['jobWorkStyle']  as String? ?? '';
+        _experience = data['jobExperience'] as String? ?? '';
+
+        if (_role == 'seeker') {
+          final sp = JobsStore.seekerProfile;
+          sp.phone        = data['jobPhone']       as String? ?? '';
+          sp.location     = data['jobLocation']    as String? ?? '';
+          sp.summary      = data['jobSummary']     as String? ?? '';
+          sp.cvUploaded   = data['jobCvUploaded']  as bool?   ?? false;
+          sp.cvFileName   = data['jobCvFileName']  as String? ?? '';
+          sp.setupComplete = true;
+        } else if (_role == 'employer') {
+          final cp = JobsStore.companyProfile;
+          cp.name         = data['companyName']     as String? ?? 'Your Company';
+          cp.logoInitial  = cp.name.isNotEmpty ? cp.name[0].toUpperCase() : 'C';
+          cp.industry     = data['companyIndustry'] as String? ?? '';
+          cp.size         = data['companySize']     as String? ?? '';
+          cp.setupComplete = true;
+        }
+      }
+
+      _lastLoadedUid = uid;
+    } catch (_) {
+      // Firestore unavailable — fall through to onboarding
+    }
+
+    if (mounted) setState(() => _loadingPrefs = false);
   }
 
   Future<void> _loadProfile() async {
@@ -103,6 +181,49 @@ class _JobPageState extends State<JobPage> {
       cp.size = _companySize;
       cp.setupComplete = true;
     }
+    _saveJobPrefsToFirestore(); // fire-and-forget persistence
+  }
+
+  // Save onboarding answers to Firestore so they survive app restarts.
+  Future<void> _saveJobPrefsToFirestore() async {
+    final auth = Provider.of<AuthService>(context, listen: false);
+    final uid = auth.currentUser?.uid;
+    if (uid == null) return;
+
+    final Map<String, dynamic> data = {
+      'jobOnboardingDone': true,
+      'jobRole':           _role,
+      'jobCategory':       _category,
+      'jobWorkStyle':      _workStyle,
+      'jobExperience':     _experience,
+    };
+
+    if (_role == 'seeker') {
+      final sp = JobsStore.seekerProfile;
+      data.addAll({
+        'jobPhone':      sp.phone,
+        'jobLocation':   sp.location,
+        'jobSummary':    sp.summary,
+        'jobCvUploaded': sp.cvUploaded,
+        'jobCvFileName': sp.cvFileName,
+      });
+    } else {
+      final cp = JobsStore.companyProfile;
+      data.addAll({
+        'companyName':     cp.name,
+        'companyIndustry': cp.industry,
+        'companySize':     cp.size,
+      });
+    }
+
+    _lastLoadedUid = uid; // mark cache as valid for this UID
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .set(data, SetOptions(merge: true));
+    } catch (_) {}
   }
 
   @override
@@ -117,6 +238,28 @@ class _JobPageState extends State<JobPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Briefly show a spinner while we check Firestore for saved preferences.
+    // This prevents the onboarding from flashing before we know the user is done.
+    if (_loadingPrefs) {
+      return Scaffold(
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFFF0EAFF), AppColors.background],
+            ),
+          ),
+          child: const Center(
+            child: CircularProgressIndicator(
+              color: AppColors.wisteria,
+              strokeWidth: 2.5,
+            ),
+          ),
+        ),
+      );
+    }
+
     if (!_done) return _buildOnboarding(context);
     if (_role == 'employer') return const EmployerDashboard();
     return SeekerDashboard(
