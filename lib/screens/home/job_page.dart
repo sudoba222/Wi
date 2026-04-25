@@ -3,7 +3,10 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import '../../utils/app_colors.dart';
+import '../../models/user_profile.dart';
+import '../../services/auth_services.dart';
 
 /// Jobs tab — two-phase UI:
 /// 1. An onboarding wizard (4 steps) to capture role, category, work style,
@@ -61,6 +64,9 @@ class _JobPageState extends State<JobPage> {
 
   // ── Job board state ──
   String _activeFilter = 'All';
+  String _searchQuery = '';
+  final _searchController = TextEditingController();
+  UserProfile? _userProfile;
   final List<Map<String, dynamic>> _jobs = [
     {
       'title': 'Flutter Developer',
@@ -160,6 +166,20 @@ class _JobPageState extends State<JobPage> {
     },
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadProfile());
+  }
+
+  Future<void> _loadProfile() async {
+    final auth = Provider.of<AuthService>(context, listen: false);
+    if (auth.currentUser != null) {
+      final p = await auth.getFullUserProfile(auth.currentUser!.uid);
+      if (mounted) setState(() => _userProfile = p);
+    }
+  }
+
   // ── Application helpers ──
   bool _isApplied(Map job) =>
       _applications.any((a) => a.jobTitle == job['title'] && a.company == job['company']);
@@ -198,6 +218,7 @@ class _JobPageState extends State<JobPage> {
   @override
   void dispose() {
     _pageController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -301,12 +322,17 @@ class _JobPageState extends State<JobPage> {
     final filters = ['All', 'Remote', 'Full-time', 'Part-time', 'Contract'];
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final filtered = _activeFilter == 'All'
-        ? _jobs
-        : _jobs.where((j) {
-            if (_activeFilter == 'Remote') return j['isRemote'] == true;
-            return j['type'] == _activeFilter;
-          }).toList();
+    final filtered = _jobs.where((j) {
+      final matchesFilter = _activeFilter == 'All'
+          ? true
+          : _activeFilter == 'Remote'
+              ? j['isRemote'] == true
+              : j['type'] == _activeFilter;
+      final matchesSearch = _searchQuery.isEmpty ||
+          (j['title'] as String).toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          (j['company'] as String).toLowerCase().contains(_searchQuery.toLowerCase());
+      return matchesFilter && matchesSearch;
+    }).toList();
 
     return Scaffold(
       body: Container(
@@ -461,24 +487,37 @@ class _JobPageState extends State<JobPage> {
                 ),
               ),
               const SizedBox(width: 8),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? Colors.white.withOpacity(0.08)
-                          : Colors.white.withOpacity(0.55),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                          color: isDark
-                              ? Colors.white.withOpacity(0.12)
-                              : Colors.white.withOpacity(0.7)),
+              GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  showModalBottomSheet(
+                    context: context,
+                    backgroundColor: Colors.transparent,
+                    builder: (_) => _AdvancedFilterSheet(
+                      activeFilter: _activeFilter,
+                      onFilterChanged: (f) => setState(() => _activeFilter = f),
                     ),
-                    child: Icon(Icons.tune_rounded, color: textColor, size: 20),
+                  );
+                },
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? Colors.white.withOpacity(0.08)
+                            : Colors.white.withOpacity(0.55),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                            color: isDark
+                                ? Colors.white.withOpacity(0.12)
+                                : Colors.white.withOpacity(0.7)),
+                      ),
+                      child: Icon(Icons.tune_rounded, color: textColor, size: 20),
+                    ),
                   ),
                 ),
               ),
@@ -492,6 +531,63 @@ class _JobPageState extends State<JobPage> {
                   ? 'Find the right talent for your team'
                   : 'Opportunities in Tajikistan & remote',
               style: const TextStyle(fontSize: 14, color: AppColors.mutedText),
+            ),
+          ),
+          const SizedBox(height: 14),
+          // Search bar
+          ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+              child: Container(
+                height: 44,
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? Colors.white.withOpacity(0.07)
+                      : Colors.white.withOpacity(0.65),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: isDark
+                        ? Colors.white.withOpacity(0.1)
+                        : AppColors.mutedText.withOpacity(0.2),
+                  ),
+                ),
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (v) => setState(() => _searchQuery = v),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: isDark ? Colors.white : AppColors.darkPurple,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Search jobs or companies…',
+                    hintStyle: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.mutedText.withOpacity(0.7),
+                    ),
+                    prefixIcon: Icon(
+                      Icons.search_rounded,
+                      size: 18,
+                      color: AppColors.mutedText,
+                    ),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? GestureDetector(
+                            onTap: () {
+                              _searchController.clear();
+                              setState(() => _searchQuery = '');
+                            },
+                            child: Icon(
+                              Icons.close_rounded,
+                              size: 16,
+                              color: AppColors.mutedText,
+                            ),
+                          )
+                        : null,
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
             ),
           ),
         ],
@@ -553,6 +649,7 @@ class _JobPageState extends State<JobPage> {
       builder: (_) => _JobDetailSheet(
         job: job,
         isApplied: _isApplied(job),
+        userProfile: _userProfile,
         onApply: (easyApply) => _applyToJob(job, easyApply),
       ),
     );
@@ -1405,12 +1502,14 @@ class _JobCard extends StatelessWidget {
 class _JobDetailSheet extends StatelessWidget {
   final Map<String, dynamic> job;
   final bool isApplied;
+  final UserProfile? userProfile;
   final void Function(bool easyApply) onApply;
 
   const _JobDetailSheet({
     required this.job,
     required this.isApplied,
     required this.onApply,
+    this.userProfile,
   });
 
   @override
@@ -1645,6 +1744,7 @@ class _JobDetailSheet extends StatelessWidget {
                               builder: (ctx) => _EasyApplySheet(
                                 jobTitle: job['title'] as String,
                                 company: job['company'] as String,
+                                userProfile: userProfile,
                                 onApply: () {
                                   onApply(true);
                                   Navigator.of(context).pop();
@@ -1755,12 +1855,14 @@ class _JobDetailSheet extends StatelessWidget {
 class _EasyApplySheet extends StatefulWidget {
   final String jobTitle;
   final String company;
+  final UserProfile? userProfile;
   final VoidCallback onApply;
 
   const _EasyApplySheet({
     required this.jobTitle,
     required this.company,
     required this.onApply,
+    this.userProfile,
   });
 
   @override
@@ -1871,32 +1973,60 @@ class _EasyApplySheetState extends State<_EasyApplySheet> {
                                 color: AppColors.wisteria,
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              child: const Center(
-                                child: Text(
-                                  'Y',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ),
+                              child: widget.userProfile?.profilePicture.isNotEmpty == true
+                                  ? ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Image.network(
+                                        widget.userProfile!.profilePicture,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (ctx, err, st) => Center(
+                                          child: Text(
+                                            (widget.userProfile?.name.isNotEmpty == true
+                                                    ? widget.userProfile!.name[0]
+                                                    : 'U')
+                                                .toUpperCase(),
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    )
+                                  : Center(
+                                      child: Text(
+                                        (widget.userProfile?.name.isNotEmpty == true
+                                                ? widget.userProfile!.name[0]
+                                                : 'U')
+                                            .toUpperCase(),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ),
                             ),
                             const SizedBox(width: 12),
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Your Name',
+                                  widget.userProfile?.name.isNotEmpty == true
+                                      ? widget.userProfile!.name
+                                      : 'Your Name',
                                   style: TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.w700,
                                     color: textColor,
                                   ),
                                 ),
-                                const Text(
-                                  'Your current role',
-                                  style: TextStyle(
+                                Text(
+                                  widget.userProfile?.jobTitle.isNotEmpty == true
+                                      ? widget.userProfile!.jobTitle
+                                      : 'Your current role',
+                                  style: const TextStyle(
                                     fontSize: 12,
                                     color: AppColors.mutedText,
                                   ),
@@ -3120,6 +3250,143 @@ class _InfoChip extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  ADVANCED FILTER SHEET
+// ════════════════════════════════════════════════════════════
+
+class _AdvancedFilterSheet extends StatefulWidget {
+  final String activeFilter;
+  final void Function(String) onFilterChanged;
+
+  const _AdvancedFilterSheet({
+    required this.activeFilter,
+    required this.onFilterChanged,
+  });
+
+  @override
+  State<_AdvancedFilterSheet> createState() => _AdvancedFilterSheetState();
+}
+
+class _AdvancedFilterSheetState extends State<_AdvancedFilterSheet> {
+  late String _selected;
+
+  static const _options = [
+    ('All', Icons.apps_rounded),
+    ('Remote', Icons.laptop_rounded),
+    ('Full-time', Icons.work_rounded),
+    ('Part-time', Icons.work_outline_rounded),
+    ('Contract', Icons.assignment_rounded),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = widget.activeFilter;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = isDark ? AppColors.darkCard : Colors.white;
+    final textColor = isDark ? Colors.white : AppColors.darkPurple;
+
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      child: Container(
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.symmetric(vertical: 14),
+              decoration: BoxDecoration(
+                color: AppColors.mutedText.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+              child: Row(
+                children: [
+                  Text(
+                    'Filter Jobs',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: textColor,
+                    ),
+                  ),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: () {
+                      widget.onFilterChanged('All');
+                      Navigator.pop(context);
+                    },
+                    child: Text(
+                      'Reset',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.wisteria,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Divider(color: AppColors.mutedText.withOpacity(0.12), height: 1),
+            ..._options.map((opt) {
+              final (label, icon) = opt;
+              final isSelected = _selected == label;
+              return ListTile(
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  setState(() => _selected = label);
+                  widget.onFilterChanged(label);
+                  Navigator.pop(context);
+                },
+                leading: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? AppColors.sunglow.withOpacity(0.15)
+                        : AppColors.mutedText.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    icon,
+                    size: 18,
+                    color: isSelected ? AppColors.sunglow : AppColors.mutedText,
+                  ),
+                ),
+                title: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    color: isSelected ? (isDark ? AppColors.sunglow : AppColors.darkPurple) : textColor,
+                  ),
+                ),
+                trailing: isSelected
+                    ? Icon(Icons.check_rounded, color: AppColors.sunglow, size: 20)
+                    : null,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 2),
+              );
+            }),
+            SizedBox(height: MediaQuery.of(context).padding.bottom + 16),
+          ],
+        ),
       ),
     );
   }
