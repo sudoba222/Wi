@@ -1,4 +1,4 @@
-// ignore_for_file: deprecated_member_use
+// ignore_for_file: deprecated_member_use, unused_local_variable, use_build_context_synchronously
 
 import 'dart:async';
 import 'dart:ui';
@@ -7,14 +7,18 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../utils/app_colors.dart';
 import '../../models/message.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/chat_service.dart';
 import '../../services/auth_services.dart';
 import '../../services/notification_service.dart';
+import '../../models/user_profile.dart';
+import '../profile/profile_page.dart';
 
 class ChatScreen extends StatefulWidget {
   final String conversationId;
   final String otherUserName;
   final String otherUserId;
+  final String otherUserProfilePicture;
   final bool isPinned;
   final VoidCallback? onTogglePin;
 
@@ -23,6 +27,7 @@ class ChatScreen extends StatefulWidget {
     required this.conversationId,
     required this.otherUserName,
     required this.otherUserId,
+    this.otherUserProfilePicture = '',
     this.isPinned = false,
     this.onTogglePin,
   });
@@ -94,6 +99,35 @@ class _ChatScreenState extends State<ChatScreen> {
         curve: Curves.easeOut,
       );
     }
+  }
+
+  Future<void> _openOtherProfile() async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.otherUserId)
+          .get();
+      final data = doc.data() ?? {};
+      final profile = UserProfile(
+        id: widget.otherUserId,
+        name: data['fullName'] as String? ?? widget.otherUserName,
+        jobTitle: data['jobTitle'] as String? ?? '',
+        company: data['company'] as String? ?? '',
+        location: data['location'] as String? ?? '',
+        bio: data['bio'] as String? ?? '',
+        profilePicture: data['profilePicture'] as String? ??
+            widget.otherUserProfilePicture,
+        coverImage: data['coverImage'] as String? ?? '',
+        connections: (data['connections'] as int?) ?? 0,
+        posts: (data['posts'] as int?) ?? 0,
+        followers: (data['followers'] as int?) ?? 0,
+        skills: List<String>.from(data['skills'] ?? []),
+      );
+      if (mounted) {
+        Navigator.push(context,
+            MaterialPageRoute(builder: (_) => ProfilePage(userProfile: profile)));
+      }
+    } catch (_) {}
   }
 
   Future<void> _sendMessage() async {
@@ -347,8 +381,8 @@ class _ChatScreenState extends State<ChatScreen> {
                       if (_showScrollDown) _scrollToBottom();
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.sunglow,
-                      foregroundColor: AppColors.darkPurple,
+                      backgroundColor: AppColors.wisteria,
+                      foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16)),
@@ -433,6 +467,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         message: msg,
                         currentUserId: chatService.currentUserId,
                         otherUserName: widget.otherUserName,
+                        otherUserProfilePicture: widget.otherUserProfilePicture,
                         onStatusChange: (messageId, status) async {
                           await chatService.updateMeetingStatus(
                             widget.conversationId,
@@ -559,34 +594,50 @@ class _ChatScreenState extends State<ChatScreen> {
                     color: isDark ? Colors.white : AppColors.darkPurple,
                     size: 20),
               ),
-              Container(
-                width: 38, height: 38,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: [AppColors.wisteria, AppColors.splashPurple],
-                  ),
-                ),
-                child: Center(
-                  child: Text(initial,
-                      style: const TextStyle(
-                          color: AppColors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700)),
-                ),
-              ),
-              const SizedBox(width: 10),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(name,
-                        style: TextStyle(
-                            color: isDark ? Colors.white : AppColors.darkPurple,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700)),
-                    StreamBuilder<Map<String, dynamic>>(
+                child: GestureDetector(
+                  onTap: _openOtherProfile,
+                  behavior: HitTestBehavior.opaque,
+                  child: Row(
+                    children: [
+                      widget.otherUserProfilePicture.isNotEmpty
+                          ? CircleAvatar(
+                              radius: 19,
+                              backgroundImage: NetworkImage(
+                                  widget.otherUserProfilePicture),
+                            )
+                          : Container(
+                              width: 38,
+                              height: 38,
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: LinearGradient(colors: [
+                                  AppColors.wisteria,
+                                  AppColors.splashPurple
+                                ]),
+                              ),
+                              child: Center(
+                                child: Text(initial,
+                                    style: const TextStyle(
+                                        color: AppColors.white,
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700)),
+                              ),
+                            ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(name,
+                                style: TextStyle(
+                                    color: isDark
+                                        ? Colors.white
+                                        : AppColors.darkPurple,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700)),
+                            StreamBuilder<Map<String, dynamic>>(
                       stream: Provider.of<ChatService>(context,
                               listen: false)
                           .getUserPresenceStream(widget.otherUserId),
@@ -633,7 +684,11 @@ class _ChatScreenState extends State<ChatScreen> {
                         );
                       },
                     ),
-                  ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               IconButton(
@@ -764,7 +819,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       const SizedBox(width: 8),
                       ValueListenableBuilder<bool>(
                         valueListenable: _hasText,
-                        builder: (_, hasText, __) => GestureDetector(
+                        builder: (context, hasText, child) => GestureDetector(
                           onTap: hasText ? _sendMessage : null,
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 180),
@@ -772,7 +827,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             height: 44,
                             decoration: BoxDecoration(
                               color: hasText
-                                  ? AppColors.sunglow
+                                  ? AppColors.wisteria
                                   : AppColors.background,
                               shape: BoxShape.circle,
                             ),
@@ -781,7 +836,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                   ? Icons.send_rounded
                                   : Icons.mic_rounded,
                               color: hasText
-                                  ? AppColors.darkPurple
+                                  ? Colors.white
                                   : AppColors.mutedText,
                               size: 20,
                             ),
@@ -804,6 +859,7 @@ class _MessageBubble extends StatelessWidget {
   final Message message;
   final String currentUserId;
   final String otherUserName;
+  final String otherUserProfilePicture;
   final void Function(String messageId, String status) onStatusChange;
   final void Function(String emoji) onReact;
   final VoidCallback onReply;
@@ -813,6 +869,7 @@ class _MessageBubble extends StatelessWidget {
     required this.message,
     required this.currentUserId,
     required this.otherUserName,
+    this.otherUserProfilePicture = '',
     required this.onStatusChange,
     required this.onReact,
     required this.onReply,
@@ -944,6 +1001,8 @@ class _MessageBubble extends StatelessWidget {
         onLongPress: () => _showOptions(context),
         child: _MeetingCard(
           message: message,
+          otherUserName: otherUserName,
+          otherUserProfilePicture: otherUserProfilePicture,
           onStatusChange: onStatusChange,
         ),
       );
@@ -970,24 +1029,34 @@ class _MessageBubble extends StatelessWidget {
           children: [
             if (!isSent)
               Container(
-                width: 28, height: 28,
                 margin: const EdgeInsets.only(right: 6, bottom: 2),
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                      colors: [AppColors.wisteria, AppColors.splashPurple]),
-                ),
-                child: Center(
-                  child: Text(
-                    otherUserName.isNotEmpty
-                        ? otherUserName[0].toUpperCase()
-                        : '?',
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold),
-                  ),
-                ),
+                child: otherUserProfilePicture.isNotEmpty
+                    ? CircleAvatar(
+                        radius: 14,
+                        backgroundImage: NetworkImage(otherUserProfilePicture),
+                      )
+                    : Container(
+                        width: 28,
+                        height: 28,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(colors: [
+                            AppColors.wisteria,
+                            AppColors.splashPurple
+                          ]),
+                        ),
+                        child: Center(
+                          child: Text(
+                            otherUserName.isNotEmpty
+                                ? otherUserName[0].toUpperCase()
+                                : '?',
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
               ),
             Column(
               crossAxisAlignment:
@@ -998,7 +1067,9 @@ class _MessageBubble extends StatelessWidget {
                       maxWidth:
                           MediaQuery.of(context).size.width * 0.72),
                   decoration: BoxDecoration(
-                    color: isSent ? AppColors.sunglow : receivedColor,
+                    color: isSent
+                        ? const Color(0xFF6D5BA3)
+                        : receivedColor,
                     borderRadius: BorderRadius.only(
                       topLeft: const Radius.circular(18),
                       topRight: const Radius.circular(18),
@@ -1035,9 +1106,7 @@ class _MessageBubble extends StatelessWidget {
                           message.text,
                           style: TextStyle(
                             fontSize: 15,
-                            color: isSent
-                                ? AppColors.darkPurple
-                                : receivedTextColor,
+                            color: isSent ? Colors.white : receivedTextColor,
                             height: 1.4,
                           ),
                         ),
@@ -1074,7 +1143,7 @@ class _MessageBubble extends StatelessWidget {
                             : Icons.done_rounded,
                         size: 14,
                         color: message.readBy.length > 1
-                            ? AppColors.sunglow
+                            ? AppColors.wisteria
                             : AppColors.mutedText,
                       ),
                     ],
@@ -1297,16 +1366,16 @@ class _InlineReplyPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bg = isSent
-        ? Colors.black.withOpacity(0.15)
+        ? Colors.white.withOpacity(0.15)
         : (isDark
             ? Colors.white.withOpacity(0.1)
             : AppColors.wisteria.withOpacity(0.09));
     final accentColor = isSent
-        ? (isDark ? Colors.white70 : AppColors.darkPurple.withOpacity(0.5))
+        ? Colors.white.withOpacity(0.8)
         : AppColors.wisteria;
     final nameColor = accentColor;
     final textColor = isSent
-        ? AppColors.darkPurple.withOpacity(0.65)
+        ? Colors.white.withOpacity(0.7)
         : (isDark ? Colors.white60 : AppColors.darkPurple.withOpacity(0.55));
 
     return Container(
@@ -1567,10 +1636,14 @@ class _EmojiPickerBtnState extends State<_EmojiPickerBtn>
 
 class _MeetingCard extends StatelessWidget {
   final Message message;
+  final String otherUserName;
+  final String otherUserProfilePicture;
   final void Function(String messageId, String status) onStatusChange;
 
   const _MeetingCard({
     required this.message,
+    this.otherUserName = '',
+    this.otherUserProfilePicture = '',
     required this.onStatusChange,
   });
 
@@ -1590,20 +1663,34 @@ class _MeetingCard extends StatelessWidget {
         children: [
           if (!isSent)
             Container(
-              width: 28, height: 28,
               margin: const EdgeInsets.only(right: 6, bottom: 2),
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                    colors: [AppColors.wisteria, AppColors.splashPurple]),
-              ),
-              child: const Center(
-                child: Text('?',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold)),
-              ),
+              child: otherUserProfilePicture.isNotEmpty
+                  ? CircleAvatar(
+                      radius: 14,
+                      backgroundImage: NetworkImage(otherUserProfilePicture),
+                    )
+                  : Container(
+                      width: 28,
+                      height: 28,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(colors: [
+                          AppColors.wisteria,
+                          AppColors.splashPurple
+                        ]),
+                      ),
+                      child: Center(
+                        child: Text(
+                          otherUserName.isNotEmpty
+                              ? otherUserName[0].toUpperCase()
+                              : '?',
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
             ),
           Container(
             constraints: BoxConstraints(

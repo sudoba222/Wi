@@ -1,13 +1,17 @@
 // ignore_for_file: deprecated_member_use
 
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../utils/app_colors.dart';
 import '../../services/chat_service.dart';
+import '../../services/auth_services.dart';
 import '../../models/conversation.dart';
+import '../../models/user_profile.dart';
 import '../chat/chat_screen.dart';
+import '../profile/profile_page.dart';
 
 class MessagesPage extends StatefulWidget {
   const MessagesPage({super.key});
@@ -63,28 +67,27 @@ void _loadPinnedConversations() {
     builder: (ctx) => Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
       child: _UserSearchSheet(
-        onStart: (otherUserId, otherUserName) async {
+        onStart: (otherUserId, otherUserName, picture) async {
           try {
-            final convId = await chatService.getOrCreateConversation(otherUserId);
-            print('✅ Conv ID: $convId');
+            final convId =
+                await chatService.getOrCreateConversation(otherUserId);
             await Future.delayed(const Duration(milliseconds: 300));
             if (mounted) {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                    builder: (_) => ChatScreen(
+                  builder: (_) => ChatScreen(
                     conversationId: convId,
                     otherUserName: otherUserName,
                     otherUserId: otherUserId,
+                    otherUserProfilePicture: picture,
                     isPinned: _pinnedIds.contains(convId),
                     onTogglePin: () => _togglePin(convId),
                   ),
                 ),
               );
             }
-          } catch (e) {
-            print('❌ Error opening chat: $e');
-          }
+          } catch (_) {}
         },
       ),
     ),
@@ -95,14 +98,46 @@ void _loadPinnedConversations() {
       context,
       MaterialPageRoute(
         builder: (_) => ChatScreen(
-            conversationId: conv.id,
-            otherUserName: conv.userName,
-            otherUserId: conv.otherUserId,
-            isPinned: _pinnedIds.contains(conv.id),
-            onTogglePin: () => _togglePin(conv.id),
-          ),
+          conversationId: conv.id,
+          otherUserName: conv.userName,
+          otherUserId: conv.otherUserId,
+          otherUserProfilePicture: conv.otherUserProfilePicture,
+          isPinned: _pinnedIds.contains(conv.id),
+          onTogglePin: () => _togglePin(conv.id),
+        ),
       ),
     );
+  }
+
+  Future<void> _openProfile(Conversation conv) async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(conv.otherUserId)
+          .get();
+      final data = doc.data() ?? {};
+      final profile = UserProfile(
+        id: conv.otherUserId,
+        name: data['fullName'] as String? ?? conv.userName,
+        jobTitle: data['jobTitle'] as String? ?? '',
+        company: data['company'] as String? ?? '',
+        location: data['location'] as String? ?? '',
+        bio: data['bio'] as String? ?? '',
+        profilePicture: data['profilePicture'] as String? ??
+            conv.otherUserProfilePicture,
+        coverImage: data['coverImage'] as String? ?? '',
+        connections: (data['connections'] as int?) ?? 0,
+        posts: (data['posts'] as int?) ?? 0,
+        followers: (data['followers'] as int?) ?? 0,
+        skills: List<String>.from(data['skills'] ?? []),
+        experience: const [],
+        education: const [],
+      );
+      if (mounted) {
+        Navigator.push(context,
+            MaterialPageRoute(builder: (_) => ProfilePage(userProfile: profile)));
+      }
+    } catch (_) {}
   }
 
   @override
@@ -185,13 +220,17 @@ void _loadPinnedConversations() {
                       ),
                       ...pinned.map((c) => _ConversationTile(
                         conversation: c, isPinned: true, isDark: isDark,
-                        onTap: () => _openChat(c), onTogglePin: () => _togglePin(c.id),
+                        onTap: () => _openChat(c),
+                        onAvatarTap: () => _openProfile(c),
+                        onTogglePin: () => _togglePin(c.id),
                       )),
                       if (unpinned.isNotEmpty) const SizedBox(height: 4),
                     ],
                     ...unpinned.map((c) => _ConversationTile(
                       conversation: c, isPinned: false, isDark: isDark,
-                      onTap: () => _openChat(c), onTogglePin: () => _togglePin(c.id),
+                      onTap: () => _openChat(c),
+                      onAvatarTap: () => _openProfile(c),
+                      onTogglePin: () => _togglePin(c.id),
                     )),
                   ],
                 );
@@ -234,9 +273,9 @@ void _loadPinnedConversations() {
             onTap: _showNewChatSheet,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              decoration: BoxDecoration(color: AppColors.sunglow, borderRadius: BorderRadius.circular(20)),
+              decoration: BoxDecoration(color: AppColors.wisteria, borderRadius: BorderRadius.circular(20)),
               child: const Text('New Conversation',
-                style: TextStyle(color: AppColors.darkPurple, fontWeight: FontWeight.w700, fontSize: 14)),
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14)),
             ),
           ),
         ],
@@ -286,8 +325,8 @@ class _SearchBarWithNewChat extends StatelessWidget {
                 child: Container(
                   margin: const EdgeInsets.only(right: 10),
                   width: 36, height: 36,
-                  decoration: BoxDecoration(color: AppColors.sunglow, borderRadius: BorderRadius.circular(10)),
-                  child: const Icon(Icons.edit_outlined, size: 18, color: AppColors.darkPurple),
+                  decoration: BoxDecoration(color: AppColors.wisteria, borderRadius: BorderRadius.circular(10)),
+                  child: const Icon(Icons.edit_outlined, size: 18, color: Colors.white),
                 ),
               ),
             ],
@@ -303,8 +342,16 @@ class _ConversationTile extends StatelessWidget {
   final bool isPinned;
   final bool isDark;
   final VoidCallback onTap;
+  final VoidCallback onAvatarTap;
   final VoidCallback onTogglePin;
-  const _ConversationTile({required this.conversation, required this.isPinned, required this.isDark, required this.onTap, required this.onTogglePin});
+  const _ConversationTile({
+    required this.conversation,
+    required this.isPinned,
+    required this.isDark,
+    required this.onTap,
+    required this.onAvatarTap,
+    required this.onTogglePin,
+  });
 
   void _showPinMenu(BuildContext context) {
     showModalBottomSheet(
@@ -321,7 +368,7 @@ class _ConversationTile extends StatelessWidget {
               decoration: BoxDecoration(color: AppColors.mutedText.withOpacity(0.3), borderRadius: BorderRadius.circular(2)))),
             ListTile(
               leading: Icon(isPinned ? Icons.push_pin_outlined : Icons.push_pin_rounded,
-                color: isPinned ? AppColors.mutedText : AppColors.sunglow),
+                color: isPinned ? AppColors.mutedText : AppColors.wisteria),
               title: Text(isPinned ? 'Unpin chat' : 'Pin chat',
                 style: TextStyle(color: isDark ? Colors.white : AppColors.darkPurple, fontWeight: FontWeight.w600)),
               onTap: () { Navigator.pop(context); onTogglePin(); },
@@ -350,71 +397,75 @@ class _ConversationTile extends StatelessWidget {
               decoration: BoxDecoration(
                 color: isDark
                     ? (isPinned ? Colors.white.withOpacity(0.1) : Colors.white.withOpacity(0.06))
-                    : (isPinned ? AppColors.sunglow.withOpacity(0.08) : Colors.white.withOpacity(0.55)),
+                    : (isPinned ? AppColors.wisteria.withOpacity(0.07) : Colors.white.withOpacity(0.55)),
                 borderRadius: BorderRadius.circular(18),
                 border: Border.all(
-                  color: isPinned ? AppColors.sunglow.withOpacity(0.45) : (isDark ? Colors.white.withOpacity(0.1) : AppColors.wisteria.withOpacity(0.2)),
+                  color: isPinned
+                      ? AppColors.wisteria.withOpacity(0.4)
+                      : (isDark ? Colors.white.withOpacity(0.1) : AppColors.wisteria.withOpacity(0.2)),
                   width: isPinned ? 1.5 : 1,
                 ),
               ),
               child: Row(
                 children: [
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      conversation.otherUserProfilePicture.isNotEmpty
-                          ? CircleAvatar(
-                              radius: 25,
-                              backgroundImage: NetworkImage(
-                                  conversation.otherUserProfilePicture))
-                          : Container(
-                              width: 50, height: 50,
-                              decoration: const BoxDecoration(
+                  GestureDetector(
+                    onTap: onAvatarTap,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        conversation.otherUserProfilePicture.isNotEmpty
+                            ? CircleAvatar(
+                                radius: 25,
+                                backgroundImage: NetworkImage(
+                                    conversation.otherUserProfilePicture))
+                            : Container(
+                                width: 50, height: 50,
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: LinearGradient(colors: [
+                                    AppColors.wisteria,
+                                    AppColors.splashPurple
+                                  ]),
+                                ),
+                                child: Center(
+                                  child: Text(initial,
+                                      style: const TextStyle(
+                                          color: AppColors.white,
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.bold)),
+                                ),
+                              ),
+                        if (conversation.isOnline)
+                          Positioned(
+                            right: 0,
+                            bottom: 0,
+                            child: Container(
+                              width: 13, height: 13,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF2ECC71),
                                 shape: BoxShape.circle,
-                                gradient: LinearGradient(colors: [
-                                  AppColors.wisteria,
-                                  AppColors.splashPurple
-                                ]),
-                              ),
-                              child: Center(
-                                child: Text(initial,
-                                    style: const TextStyle(
-                                        color: AppColors.white,
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.bold)),
+                                border: Border.all(
+                                    color: isDark
+                                        ? const Color(0xFF1E0B2C)
+                                        : Colors.white,
+                                    width: 2),
                               ),
                             ),
-                      // Online green dot
-                      if (conversation.isOnline)
-                        Positioned(
-                          right: 0,
-                          bottom: 0,
-                          child: Container(
-                            width: 13, height: 13,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF2ECC71),
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                  color: isDark
-                                      ? const Color(0xFF1E0B2C)
-                                      : Colors.white,
-                                  width: 2),
+                          )
+                        else if (isPinned)
+                          Positioned(
+                            right: 0, bottom: 0,
+                            child: Container(
+                              width: 18, height: 18,
+                              decoration: BoxDecoration(
+                                  color: AppColors.wisteria,
+                                  shape: BoxShape.circle),
+                              child: const Icon(Icons.push_pin_rounded,
+                                  size: 11, color: Colors.white),
                             ),
                           ),
-                        )
-                      else if (isPinned)
-                        Positioned(
-                          right: 0, bottom: 0,
-                          child: Container(
-                            width: 18, height: 18,
-                            decoration: const BoxDecoration(
-                                color: AppColors.sunglow,
-                                shape: BoxShape.circle),
-                            child: const Icon(Icons.push_pin_rounded,
-                                size: 11, color: AppColors.darkPurple),
-                          ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -496,7 +547,7 @@ class _ConversationTile extends StatelessWidget {
 }
 
 class _UserSearchSheet extends StatefulWidget {
-  final void Function(String uid, String name) onStart;
+  final void Function(String uid, String name, String picture) onStart;
   const _UserSearchSheet({required this.onStart});
 
   @override
@@ -507,11 +558,25 @@ class _UserSearchSheetState extends State<_UserSearchSheet> {
   final _ctrl = TextEditingController();
   List<Map<String, dynamic>> _results = [];
   bool _loading = false;
+  String _query = '';
+  Timer? _debounce;
+
+  void _onChanged(String value) {
+    _query = value;
+    _debounce?.cancel();
+    if (value.trim().isEmpty) {
+      setState(() { _results = []; _loading = false; });
+      return;
+    }
+    setState(() => _loading = true);
+    _debounce = Timer(const Duration(milliseconds: 350), () => _search(value));
+  }
 
   Future<void> _search(String query) async {
     final q = query.trim();
-    if (q.isEmpty) { setState(() { _results = []; _loading = false; }); return; }
-    setState(() => _loading = true);
+    if (q.isEmpty) return;
+    final currentUid =
+        Provider.of<AuthService>(context, listen: false).currentUser?.uid;
     try {
       final byName = await FirebaseFirestore.instance.collection('users')
           .where('fullName', isGreaterThanOrEqualTo: q)
@@ -522,6 +587,7 @@ class _UserSearchSheetState extends State<_UserSearchSheet> {
       final seen = <String>{};
       final merged = <Map<String, dynamic>>[];
       for (final doc in [...byName.docs, ...byEmail.docs]) {
+        if (doc.id == currentUid) continue;
         if (seen.add(doc.id)) merged.add({...doc.data(), 'uid': doc.id});
       }
       if (mounted) setState(() { _results = merged; _loading = false; });
@@ -534,19 +600,31 @@ class _UserSearchSheetState extends State<_UserSearchSheet> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      height: MediaQuery.of(context).size.height * 0.75,
+      height: MediaQuery.of(context).size.height * 0.8,
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkDrawer : AppColors.white,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Center(child: Container(width: 40, height: 4, margin: const EdgeInsets.only(bottom: 16),
-            decoration: BoxDecoration(color: AppColors.mutedText.withOpacity(0.3), borderRadius: BorderRadius.circular(2)))),
-          Align(alignment: Alignment.centerLeft,
-            child: Text('New Conversation', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800,
-                color: isDark ? Colors.white : AppColors.darkPurple))),
+          Center(
+            child: Container(
+              width: 40, height: 4,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                  color: AppColors.mutedText.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2)),
+            ),
+          ),
+          Text('New Conversation',
+              style: TextStyle(
+                  fontSize: 18, fontWeight: FontWeight.w800,
+                  color: isDark ? Colors.white : AppColors.darkPurple)),
+          const SizedBox(height: 4),
+          const Text('Search by name or email',
+              style: TextStyle(fontSize: 13, color: AppColors.mutedText)),
           const SizedBox(height: 14),
           Container(
             decoration: BoxDecoration(
@@ -558,14 +636,25 @@ class _UserSearchSheetState extends State<_UserSearchSheet> {
               type: MaterialType.transparency,
               child: TextField(
                 controller: _ctrl, autofocus: true,
-                style: TextStyle(color: isDark ? Colors.white : AppColors.darkPurple),
-                onChanged: _search,
-                decoration: const InputDecoration(
-                  hintText: 'Search by name or email…',
-                  hintStyle: TextStyle(color: AppColors.mutedText),
-                  prefixIcon: Icon(Icons.search_rounded, color: AppColors.wisteria, size: 20),
+                style: TextStyle(
+                    color: isDark ? Colors.white : AppColors.darkPurple,
+                    fontSize: 15),
+                onChanged: _onChanged,
+                decoration: InputDecoration(
+                  hintText: 'Name or email…',
+                  hintStyle: const TextStyle(color: AppColors.mutedText),
+                  prefixIcon: const Icon(Icons.search_rounded,
+                      color: AppColors.wisteria, size: 20),
+                  suffixIcon: _query.isNotEmpty
+                      ? GestureDetector(
+                          onTap: () { _ctrl.clear(); _onChanged(''); },
+                          child: const Icon(Icons.close_rounded,
+                              color: AppColors.mutedText, size: 18),
+                        )
+                      : null,
                   border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                 ),
               ),
             ),
@@ -573,36 +662,89 @@ class _UserSearchSheetState extends State<_UserSearchSheet> {
           const SizedBox(height: 12),
           Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator(color: AppColors.wisteria, strokeWidth: 2))
+                ? const Center(
+                    child: CircularProgressIndicator(
+                        color: AppColors.wisteria, strokeWidth: 2))
                 : _results.isEmpty
-                    ? Center(child: Text(_ctrl.text.isEmpty ? 'Type a name or email to search' : 'No users found',
-                        style: const TextStyle(color: AppColors.mutedText, fontSize: 14)))
-                    : ListView.builder(
+                    ? _buildEmpty(isDark)
+                    : ListView.separated(
                         itemCount: _results.length,
+                        separatorBuilder: (_, idx) => Divider(
+                          height: 1, indent: 72,
+                          color: isDark
+                              ? Colors.white.withOpacity(0.06)
+                              : Colors.black.withOpacity(0.05),
+                        ),
                         itemBuilder: (_, i) {
                           final u = _results[i];
-                          final name = u['fullName'] ?? u['email'] ?? 'Unknown';
-                          final email = u['email'] ?? '';
-                          final uid = u['uid'] ?? '';
-                          final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+                          final name = u['fullName'] as String? ??
+                              u['email'] as String? ?? 'Unknown';
+                          final jobTitle = u['jobTitle'] as String? ?? '';
+                          final company = u['company'] as String? ?? '';
+                          final subtitle = [jobTitle, company]
+                              .where((s) => s.isNotEmpty)
+                              .join(' at ');
+                          final uid = u['uid'] as String? ?? '';
+                          final picture = u['profilePicture'] as String? ?? '';
+                          final initial =
+                              name.isNotEmpty ? name[0].toUpperCase() : '?';
                           return ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
-                            leading: Container(width: 44, height: 44,
-                              decoration: const BoxDecoration(shape: BoxShape.circle,
-                                gradient: LinearGradient(colors: [AppColors.wisteria, AppColors.splashPurple])),
-                              child: Center(child: Text(initial, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)))),
-                            title: Text(name, style: const TextStyle(color: AppColors.darkPurple, fontWeight: FontWeight.w600, fontSize: 15)),
-                            subtitle: Text(email, style: const TextStyle(color: AppColors.mutedText, fontSize: 12)),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 0, vertical: 6),
+                            leading: picture.isNotEmpty
+                                ? CircleAvatar(
+                                    radius: 22,
+                                    backgroundImage: NetworkImage(picture),
+                                  )
+                                : Container(
+                                    width: 44, height: 44,
+                                    decoration: const BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      gradient: LinearGradient(colors: [
+                                        AppColors.wisteria,
+                                        AppColors.splashPurple
+                                      ]),
+                                    ),
+                                    child: Center(
+                                      child: Text(initial,
+                                          style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 16)),
+                                    ),
+                                  ),
+                            title: Text(name,
+                                style: TextStyle(
+                                    color: isDark
+                                        ? Colors.white
+                                        : AppColors.darkPurple,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 15)),
+                            subtitle: subtitle.isNotEmpty
+                                ? Text(subtitle,
+                                    style: const TextStyle(
+                                        color: AppColors.mutedText,
+                                        fontSize: 12))
+                                : null,
                             trailing: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                              decoration: BoxDecoration(color: AppColors.sunglow, borderRadius: BorderRadius.circular(20)),
-                              child: const Text('Chat', style: TextStyle(color: AppColors.darkPurple, fontWeight: FontWeight.w700, fontSize: 13))),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 7),
+                              decoration: BoxDecoration(
+                                  color: AppColors.wisteria,
+                                  borderRadius: BorderRadius.circular(20)),
+                              child: const Text('Chat',
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13)),
+                            ),
                             onTap: () {
                               Navigator.pop(context);
-                              Future.delayed(const Duration(milliseconds: 300), () {
-                                widget.onStart(uid, name);
-                              });
-},
+                              Future.delayed(
+                                const Duration(milliseconds: 300),
+                                () => widget.onStart(uid, name, picture),
+                              );
+                            },
                           );
                         },
                       ),
@@ -612,6 +754,53 @@ class _UserSearchSheetState extends State<_UserSearchSheet> {
     );
   }
 
+  Widget _buildEmpty(bool isDark) {
+    if (_query.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 64, height: 64,
+              decoration: BoxDecoration(
+                color: AppColors.wisteria.withOpacity(0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.person_search_rounded,
+                  color: AppColors.wisteria, size: 30),
+            ),
+            const SizedBox(height: 14),
+            Text('Find someone to chat with',
+                style: TextStyle(
+                    fontSize: 15, fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white70 : AppColors.darkPurple)),
+            const SizedBox(height: 6),
+            const Text('Type a name or email above',
+                style: TextStyle(fontSize: 13, color: AppColors.mutedText)),
+          ],
+        ),
+      );
+    }
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.search_off_rounded,
+              color: AppColors.mutedText, size: 40),
+          const SizedBox(height: 12),
+          Text('No results for "$_query"',
+              style: TextStyle(
+                  fontSize: 14,
+                  color: isDark ? Colors.white60 : AppColors.mutedText)),
+        ],
+      ),
+    );
+  }
+
   @override
-  void dispose() { _ctrl.dispose(); super.dispose(); }
+  void dispose() {
+    _debounce?.cancel();
+    _ctrl.dispose();
+    super.dispose();
+  }
 }
