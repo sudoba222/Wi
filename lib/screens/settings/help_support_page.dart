@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../utils/app_colors.dart';
 import '../../providers/language_provider.dart';
+import 'bug_report_page.dart';
 
 class HelpSupportPage extends StatefulWidget {
   const HelpSupportPage({super.key});
@@ -125,6 +126,7 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
               title: lang.t('reportBug'),
               subtitle: lang.t('reportBugSub'),
               isDark: isDark,
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BugReportPage())),
             ),
 
             const SizedBox(height: 24),
@@ -190,39 +192,43 @@ class _ContactTile extends StatelessWidget {
   final IconData icon;
   final String title, subtitle;
   final bool isDark;
-  const _ContactTile({required this.card, required this.icon, required this.title, required this.subtitle, required this.isDark});
+  final VoidCallback? onTap;
+  const _ContactTile({required this.card, required this.icon, required this.title, required this.subtitle, required this.isDark, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final text = isDark ? Colors.white : AppColors.darkPurple;
     final sub = isDark ? Colors.white54 : AppColors.mutedText;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: card,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8)],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40, height: 40,
-            decoration: BoxDecoration(color: AppColors.wisteria.withOpacity(0.13), borderRadius: BorderRadius.circular(10)),
-            child: Icon(icon, color: AppColors.wisteria, size: 20),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: TextStyle(color: text, fontSize: 14, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 2),
-                Text(subtitle, style: TextStyle(color: sub, fontSize: 12)),
-              ],
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: card,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8)],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40, height: 40,
+              decoration: BoxDecoration(color: AppColors.wisteria.withOpacity(0.13), borderRadius: BorderRadius.circular(10)),
+              child: Icon(icon, color: AppColors.wisteria, size: 20),
             ),
-          ),
-          Icon(Icons.chevron_right_rounded, color: AppColors.mutedText, size: 20),
-        ],
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: TextStyle(color: text, fontSize: 14, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 2),
+                  Text(subtitle, style: TextStyle(color: sub, fontSize: 12)),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, color: onTap != null ? AppColors.wisteria : AppColors.mutedText, size: 20),
+          ],
+        ),
       ),
     );
   }

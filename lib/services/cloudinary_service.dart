@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
@@ -66,6 +67,23 @@ Future<String?> uploadPostImage(File imageFile) async {
     return null;
   }
 }
+Future<String?> uploadPostImageBytes(Uint8List bytes, String filename) async {
+  try {
+    final uri = Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/image/upload');
+    final request = http.MultipartRequest('POST', uri);
+    request.fields['upload_preset'] = uploadPreset;
+    request.fields['folder'] = 'post_images';
+    request.files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
+    final response = await request.send();
+    final responseData = await response.stream.toBytes();
+    final jsonData = jsonDecode(String.fromCharCodes(responseData));
+    if (response.statusCode == 200) return jsonData['secure_url'];
+    return null;
+  } catch (e) {
+    return null;
+  }
+}
+
   // Upload profile picture to Cloudinary
   Future<String?> uploadProfilePicture(File imageFile) async {
     try {
