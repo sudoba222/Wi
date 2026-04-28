@@ -698,7 +698,11 @@ class _PostCardState extends State<_PostCard> {
                 if (post.taggedUsers.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                    child: _TaggedUsersRow(taggedUserNames: post.taggedUserNames, count: post.taggedUsers.length),
+                    child: _TaggedUsersRow(
+                      taggedUserNames: post.taggedUserNames,
+                      taggedUserIds: post.taggedUsers,
+                      onUserTap: _openAuthorProfile,
+                    ),
                   ),
 
                 // Separator
@@ -767,44 +771,53 @@ class _PostCardState extends State<_PostCard> {
 
 class _TaggedUsersRow extends StatelessWidget {
   final List<String> taggedUserNames;
-  final int count;
-  const _TaggedUsersRow({required this.taggedUserNames, required this.count});
+  final List<String> taggedUserIds;
+  final void Function(String uid) onUserTap;
+
+  const _TaggedUsersRow({
+    required this.taggedUserNames,
+    required this.taggedUserIds,
+    required this.onUserTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final names = taggedUserNames.isNotEmpty ? taggedUserNames : null;
-    String label;
-    if (names != null && names.isNotEmpty) {
-      if (names.length == 1) {
-        label = '@${names[0]}';
-      } else if (names.length == 2) {
-        label = '@${names[0]} and @${names[1]}';
-      } else {
-        label = '@${names[0]}, @${names[1]} and ${names.length - 2} more';
-      }
-    } else {
-      label = '$count ${count == 1 ? 'person' : 'people'}';
-    }
-
-    return Row(
+    return Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 6,
+      runSpacing: 4,
       children: [
-        const Icon(Icons.person_pin_rounded, size: 14, color: AppColors.wisteria),
-        const SizedBox(width: 5),
-        Text(
-          'with ',
-          style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            Icon(Icons.person_pin_rounded, size: 14, color: AppColors.wisteria),
+            SizedBox(width: 4),
+            Text('with', style: TextStyle(fontSize: 12, color: AppColors.mutedText)),
+          ],
         ),
-        Flexible(
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              color: AppColors.wisteria,
-              fontWeight: FontWeight.w600,
+        ...List.generate(taggedUserNames.length, (i) {
+          final name = i < taggedUserNames.length ? taggedUserNames[i] : '';
+          final uid = i < taggedUserIds.length ? taggedUserIds[i] : '';
+          return GestureDetector(
+            onTap: uid.isNotEmpty ? () => onUserTap(uid) : null,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: AppColors.wisteria.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppColors.wisteria.withOpacity(0.3)),
+              ),
+              child: Text(
+                '@$name',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.wisteria,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
+          );
+        }),
       ],
     );
   }

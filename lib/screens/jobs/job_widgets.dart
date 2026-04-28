@@ -27,6 +27,8 @@ class JobCard extends StatelessWidget {
     this.matchScore = 0,
   });
 
+  bool get _isNew => (job['posted'] as String).contains('h');
+
   @override
   Widget build(BuildContext context) {
     final logoColor = Color(job['color'] as int);
@@ -64,7 +66,9 @@ class JobCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // ── Top row: logo · company + time · badge ──
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
                         width: 46,
@@ -89,14 +93,41 @@ class JobCard extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              job['company'] as String,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.mutedText,
-                              ),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    job['company'] as String,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.mutedText,
+                                    ),
+                                  ),
+                                ),
+                                if (_isNew) ...[
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.sunglow.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: AppColors.sunglow.withOpacity(0.5)),
+                                    ),
+                                    child: const Text(
+                                      'NEW',
+                                      style: TextStyle(
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w800,
+                                        color: Color(0xFF8B6914),
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
+                            const SizedBox(height: 2),
                             Text(
                               job['posted'] as String,
                               style: const TextStyle(fontSize: 12, color: AppColors.mutedText),
@@ -104,6 +135,8 @@ class JobCard extends StatelessWidget {
                           ],
                         ),
                       ),
+                      const SizedBox(width: 8),
+                      // Top-right: match score > applied > bookmark
                       if (matchScore > 0)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -158,6 +191,7 @@ class JobCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 12),
+                  // ── Job title (big + bold) ──
                   Text(
                     job['title'] as String,
                     style: TextStyle(
@@ -167,6 +201,7 @@ class JobCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
+                  // ── Info row: location · type · remote ──
                   Row(
                     children: [
                       const Icon(Icons.location_on_outlined, size: 14, color: AppColors.mutedText),
@@ -184,6 +219,7 @@ class JobCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 12),
+                  // ── Bottom row: salary · apply button ──
                   Row(
                     children: [
                       Text(
@@ -396,14 +432,75 @@ class JobDetailSheet extends StatelessWidget {
                             InfoChip(icon: Icons.laptop_rounded, label: 'Remote OK', highlight: true),
                         ],
                       ),
+                      const SizedBox(height: 20),
+                      // ── Company section ──
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? Colors.white.withOpacity(0.04)
+                              : AppColors.background,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                              color: AppColors.mutedText.withOpacity(0.12)),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 38,
+                              height: 38,
+                              decoration: BoxDecoration(
+                                color: logoColor,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  job['logo'] as String,
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w800),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                job['company'] as String,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: isDark ? Colors.white : AppColors.darkPurple,
+                                ),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColors.wisteria.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                job['category'] as String? ?? 'General',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.splashPurple,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                       const SizedBox(height: 28),
                       _SectionTitle('About the role', isDark),
                       const SizedBox(height: 10),
                       Text(
-                        'We are looking for a talented ${job['title']} to join ${job['company']} in ${job['location']}. '
-                        'You will be part of a dynamic team building innovative products for Tajikistan '
-                        'and the broader Central Asia market.\n\n'
-                        'This is a ${(job['type'] as String).toLowerCase()} position with a competitive salary of ${job['salary']}.',
+                        job['description'] as String? ??
+                            'We are looking for a talented ${job['title']} to join ${job['company']} in ${job['location']}. '
+                            'You will be part of a dynamic team building innovative products for Tajikistan '
+                            'and the broader Central Asia market.\n\n'
+                            'This is a ${(job['type'] as String).toLowerCase()} position with a competitive salary of ${job['salary']}.',
                         style: const TextStyle(
                           fontSize: 14,
                           color: AppColors.mutedText,
@@ -413,12 +510,14 @@ class JobDetailSheet extends StatelessWidget {
                       const SizedBox(height: 28),
                       _SectionTitle('Requirements', isDark),
                       const SizedBox(height: 10),
-                      ...const [
-                        '2+ years of relevant experience',
-                        'Strong communication in Tajik, Russian or English',
-                        'Ability to work in a fast-paced environment',
-                        'Passion for building great products',
-                      ].map(
+                      ...((job['requirements'] as List<dynamic>?)?.cast<String>() ??
+                              const [
+                                '2+ years of relevant experience',
+                                'Strong communication in Tajik, Russian or English',
+                                'Ability to work in a fast-paced environment',
+                                'Passion for building great products',
+                              ])
+                          .map(
                         (r) => Padding(
                           padding: const EdgeInsets.only(bottom: 10),
                           child: Row(
@@ -441,6 +540,34 @@ class JobDetailSheet extends StatelessWidget {
                           ),
                         ),
                       ),
+                      if (job['benefits'] != null) ...[
+                        const SizedBox(height: 28),
+                        _SectionTitle('Benefits', isDark),
+                        const SizedBox(height: 10),
+                        ...((job['benefits'] as List<dynamic>).cast<String>()).map(
+                          (b) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Padding(
+                                  padding: EdgeInsets.only(top: 4),
+                                  child: Icon(Icons.star_rounded,
+                                      size: 15, color: AppColors.sunglow),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(b,
+                                      style: const TextStyle(
+                                          fontSize: 14,
+                                          color: AppColors.mutedText,
+                                          height: 1.5)),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 32),
                     ],
                   ),
@@ -1090,17 +1217,21 @@ class InfoChip extends StatelessWidget {
 }
 
 // ════════════════════════════════════════════════════════════
-//  ADVANCED FILTER SHEET
+//  ADVANCED FILTER SHEET  — multi-dimensional
 // ════════════════════════════════════════════════════════════
 
 class AdvancedFilterSheet extends StatefulWidget {
-  final String activeFilter;
-  final void Function(String) onFilterChanged;
+  final String typeFilter;
+  final String workStyleFilter;
+  final String categoryFilter;
+  final void Function(String type, String workStyle, String category) onApply;
 
   const AdvancedFilterSheet({
     super.key,
-    required this.activeFilter,
-    required this.onFilterChanged,
+    required this.typeFilter,
+    required this.workStyleFilter,
+    required this.categoryFilter,
+    required this.onApply,
   });
 
   @override
@@ -1108,20 +1239,102 @@ class AdvancedFilterSheet extends StatefulWidget {
 }
 
 class _AdvancedFilterSheetState extends State<AdvancedFilterSheet> {
-  late String _selected;
+  late String _type;
+  late String _workStyle;
+  late String _category;
 
-  static const _options = [
-    ('All', Icons.apps_rounded),
-    ('Remote', Icons.laptop_rounded),
-    ('Full-time', Icons.work_rounded),
-    ('Part-time', Icons.work_outline_rounded),
-    ('Contract', Icons.assignment_rounded),
+  static const _typeOptions = ['All', 'Full-time', 'Part-time', 'Contract'];
+  static const _workStyleOptions = ['Any', 'Remote', 'On-site', 'Hybrid'];
+  static const _categoryOptions = [
+    'All', 'Software Dev', 'Design', 'Marketing',
+    'Finance', 'HR', 'Sales', 'Operations',
+    'Education', 'Healthcare', 'Legal', 'Other',
   ];
 
   @override
   void initState() {
     super.initState();
-    _selected = widget.activeFilter;
+    _type = widget.typeFilter;
+    _workStyle = widget.workStyleFilter;
+    _category = widget.categoryFilter;
+  }
+
+  int get _activeCount {
+    int c = 0;
+    if (_type != 'All') c++;
+    if (_workStyle != 'Any') c++;
+    if (_category != 'All') c++;
+    return c;
+  }
+
+  void _reset() {
+    setState(() {
+      _type = 'All';
+      _workStyle = 'Any';
+      _category = 'All';
+    });
+  }
+
+  Widget _sectionLabel(String text, Color textColor) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 10),
+        child: Text(
+          text,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: textColor.withOpacity(0.5),
+            letterSpacing: 0.5,
+          ),
+        ),
+      );
+
+  Widget _optionRow({
+    required List<String> options,
+    required String selected,
+    required void Function(String) onSelect,
+    required bool isDark,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: options.map((opt) {
+          final isSelected = selected == opt;
+          return GestureDetector(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              onSelect(opt);
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? (isDark ? AppColors.wisteria : AppColors.darkPurple)
+                    : (isDark ? Colors.white.withOpacity(0.08) : AppColors.background),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isSelected
+                      ? (isDark ? AppColors.wisteria : AppColors.darkPurple)
+                      : AppColors.mutedText.withOpacity(0.25),
+                ),
+              ),
+              child: Text(
+                opt,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: isSelected
+                      ? (isDark ? AppColors.darkPurple : AppColors.sunglow)
+                      : AppColors.mutedText,
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
   }
 
   @override
@@ -1148,61 +1361,117 @@ class _AdvancedFilterSheetState extends State<AdvancedFilterSheet> {
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
+            // Header
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
               child: Row(
                 children: [
                   Text('Filter Jobs',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: textColor)),
+                      style: TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.w800, color: textColor)),
+                  if (_activeCount > 0) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      width: 20, height: 20,
+                      decoration: const BoxDecoration(
+                          color: AppColors.splashPurple, shape: BoxShape.circle),
+                      child: Center(
+                        child: Text('$_activeCount',
+                            style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white)),
+                      ),
+                    ),
+                  ],
                   const Spacer(),
                   GestureDetector(
-                    onTap: () {
-                      widget.onFilterChanged('All');
-                      Navigator.pop(context);
-                    },
-                    child: const Text('Reset',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.wisteria)),
+                    onTap: _reset,
+                    child: Text(
+                      'Reset All',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: _activeCount > 0
+                            ? AppColors.wisteria
+                            : AppColors.mutedText.withOpacity(0.5),
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
             Divider(color: AppColors.mutedText.withOpacity(0.12), height: 1),
-            ..._options.map((opt) {
-              final (label, icon) = opt;
-              final isSelected = _selected == label;
-              return ListTile(
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  setState(() => _selected = label);
-                  widget.onFilterChanged(label);
-                  Navigator.pop(context);
-                },
-                leading: Container(
-                  width: 36, height: 36,
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? AppColors.sunglow.withOpacity(0.15)
-                        : AppColors.mutedText.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(icon, size: 18,
-                      color: isSelected ? AppColors.sunglow : AppColors.mutedText),
+            // Scrollable sections
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _sectionLabel('JOB TYPE', textColor),
+                    _optionRow(
+                      options: _typeOptions,
+                      selected: _type,
+                      onSelect: (v) => setState(() => _type = v),
+                      isDark: isDark,
+                    ),
+                    _sectionLabel('WORK STYLE', textColor),
+                    _optionRow(
+                      options: _workStyleOptions,
+                      selected: _workStyle,
+                      onSelect: (v) => setState(() => _workStyle = v),
+                      isDark: isDark,
+                    ),
+                    _sectionLabel('CATEGORY', textColor),
+                    _optionRow(
+                      options: _categoryOptions,
+                      selected: _category,
+                      onSelect: (v) => setState(() => _category = v),
+                      isDark: isDark,
+                    ),
+                    const SizedBox(height: 24),
+                  ],
                 ),
-                title: Text(label,
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                      color: isSelected
-                          ? (isDark ? AppColors.sunglow : AppColors.darkPurple)
-                          : textColor,
-                    )),
-                trailing: isSelected
-                    ? const Icon(Icons.check_rounded, color: AppColors.sunglow, size: 20)
-                    : null,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 2),
-              );
-            }),
-            SizedBox(height: MediaQuery.of(context).padding.bottom + 16),
+              ),
+            ),
+            // Apply button
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                  24, 8, 24, MediaQuery.of(context).padding.bottom + 16),
+              child: SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    // Map display labels back to internal values
+                    final ws = _workStyle == 'Remote'
+                        ? 'remote'
+                        : _workStyle == 'On-site'
+                            ? 'onsite'
+                            : _workStyle == 'Hybrid'
+                                ? 'hybrid'
+                                : 'Any';
+                    widget.onApply(_type, ws, _category);
+                    Navigator.pop(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.darkPurple,
+                    foregroundColor: AppColors.sunglow,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                    elevation: 0,
+                  ),
+                  child: Text(
+                    _activeCount > 0
+                        ? 'Apply $_activeCount Filter${_activeCount > 1 ? 's' : ''}'
+                        : 'Apply Filters',
+                    style: const TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),

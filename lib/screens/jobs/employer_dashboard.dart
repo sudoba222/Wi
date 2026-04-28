@@ -221,7 +221,9 @@ class _EmployerDashboardState extends State<EmployerDashboard> {
   Widget _buildCompanyCard(bool isDark, Color textColor) {
     final cp = JobsStore.companyProfile;
     final logoColor = Color(cp.logoColor);
-    final initial = cp.logoInitial.isNotEmpty ? cp.logoInitial : (cp.name.isNotEmpty ? cp.name[0].toUpperCase() : 'C');
+    final initial = cp.logoInitial.isNotEmpty
+        ? cp.logoInitial
+        : (cp.name.isNotEmpty ? cp.name[0].toUpperCase() : 'C');
     final completion = cp.completionPct;
 
     return Padding(
@@ -235,86 +237,153 @@ class _EmployerDashboardState extends State<EmployerDashboard> {
             child: Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: isDark ? AppColors.darkCard : Colors.white,
+                gradient: LinearGradient(
+                  colors: isDark
+                      ? [AppColors.darkCard, AppColors.darkCard.withOpacity(0.7)]
+                      : [const Color(0xFFF5F0FF), Colors.white],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                    color: isDark ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.6)),
-                boxShadow: [BoxShadow(
-                    color: AppColors.wisteria.withOpacity(0.06), blurRadius: 16, offset: const Offset(0, 4))],
+                    color: isDark
+                        ? AppColors.wisteria.withOpacity(0.15)
+                        : AppColors.wisteria.withOpacity(0.2)),
+                boxShadow: [
+                  BoxShadow(
+                      color: AppColors.wisteria.withOpacity(0.08),
+                      blurRadius: 20,
+                      offset: const Offset(0, 4))
+                ],
               ),
               child: Column(
                 children: [
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Logo
                       Container(
                         width: 56, height: 56,
-                        decoration: BoxDecoration(color: logoColor, borderRadius: BorderRadius.circular(16)),
-                        child: Center(child: Text(initial,
-                            style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800))),
+                        decoration: BoxDecoration(
+                            color: logoColor,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                  color: logoColor.withOpacity(0.3),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4))
+                            ]),
+                        child: Center(
+                            child: Text(initial,
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w800))),
                       ),
                       const SizedBox(width: 16),
-                      Expanded(child: Column(
+                      Expanded(
+                          child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(JobsStore.companyName,
-                              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: textColor)),
+                              style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w800,
+                                  color: textColor)),
+                          const SizedBox(height: 2),
                           Row(children: [
                             if (cp.industry.isNotEmpty)
                               Text(cp.industry,
-                                  style: const TextStyle(fontSize: 13, color: AppColors.mutedText)),
+                                  style: const TextStyle(
+                                      fontSize: 13,
+                                      color: AppColors.mutedText)),
                             if (cp.industry.isNotEmpty && cp.size.isNotEmpty)
-                              const Text(' · ', style: TextStyle(fontSize: 13, color: AppColors.mutedText)),
+                              const Text(' · ',
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      color: AppColors.mutedText)),
                             if (cp.size.isNotEmpty)
                               Text('${cp.size} employees',
-                                  style: const TextStyle(fontSize: 13, color: AppColors.mutedText)),
+                                  style: const TextStyle(
+                                      fontSize: 13,
+                                      color: AppColors.mutedText)),
                           ]),
                         ],
                       )),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: isDark ? Colors.white.withOpacity(0.06) : AppColors.background,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: AppColors.mutedText.withOpacity(0.15)),
+                      // Prominent edit button
+                      GestureDetector(
+                        onTap: _openCompanyProfile,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? AppColors.wisteria.withOpacity(0.15)
+                                : AppColors.wisteria.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                                color: AppColors.wisteria.withOpacity(0.35)),
+                          ),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            Icon(Icons.edit_rounded,
+                                size: 13,
+                                color: isDark
+                                    ? AppColors.wisteria
+                                    : AppColors.splashPurple),
+                            const SizedBox(width: 5),
+                            Text('Edit',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: isDark
+                                        ? AppColors.wisteria
+                                        : AppColors.splashPurple)),
+                          ]),
                         ),
-                        child: Row(mainAxisSize: MainAxisSize.min, children: [
-                          const Icon(Icons.edit_outlined, size: 13, color: AppColors.mutedText),
-                          const SizedBox(width: 4),
-                          const Text('Edit', style: TextStyle(fontSize: 12, color: AppColors.mutedText, fontWeight: FontWeight.w600)),
-                        ]),
                       ),
                     ],
                   ),
                   if (cp.description.isNotEmpty) ...[
                     const SizedBox(height: 12),
                     Text(cp.description,
-                        maxLines: 2, overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 13, color: AppColors.mutedText, height: 1.5)),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.mutedText,
+                            height: 1.5)),
                   ],
                   // Profile completeness bar
                   const SizedBox(height: 14),
                   Row(children: [
-                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('Profile $completion% complete',
-                          style: const TextStyle(fontSize: 11, color: AppColors.mutedText)),
-                      const SizedBox(height: 4),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(3),
-                        child: LinearProgressIndicator(
-                          value: completion / 100,
-                          minHeight: 4,
-                          backgroundColor: AppColors.mutedText.withOpacity(0.15),
-                          valueColor: AlwaysStoppedAnimation(
-                            completion >= 80 ? const Color(0xFF10B981) : AppColors.sunglow,
+                    Expanded(
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                          Text('Profile $completion% complete',
+                              style: const TextStyle(
+                                  fontSize: 11, color: AppColors.mutedText)),
+                          const SizedBox(height: 4),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(3),
+                            child: LinearProgressIndicator(
+                              value: completion / 100,
+                              minHeight: 4,
+                              backgroundColor:
+                                  AppColors.mutedText.withOpacity(0.15),
+                              valueColor: AlwaysStoppedAnimation(
+                                completion >= 80
+                                    ? const Color(0xFF10B981)
+                                    : AppColors.sunglow,
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                    ])),
+                        ])),
                     const SizedBox(width: 12),
                     if (completion < 100)
                       Text('${100 - completion}% left',
-                          style: const TextStyle(fontSize: 11, color: AppColors.mutedText)),
+                          style: const TextStyle(
+                              fontSize: 11, color: AppColors.mutedText)),
                   ]),
                 ],
               ),
@@ -517,25 +586,44 @@ class _ListingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isActive = posting.status == 'active';
-    final statusColor = isActive ? const Color(0xFF10B981) : const Color(0xFFF59E0B);
+    final accentColor =
+        isActive ? const Color(0xFF10B981) : const Color(0xFFF59E0B);
+    final statusColor = accentColor;
     final reviewingPct = posting.applicantCount > 0
         ? (posting.reviewingCount + posting.interviewCount + posting.offerCount) /
             posting.applicantCount
         : 0.0;
-    final interviewPct =
-        posting.applicantCount > 0 ? posting.interviewCount / posting.applicantCount : 0.0;
+    final interviewPct = posting.applicantCount > 0
+        ? posting.interviewCount / posting.applicantCount
+        : 0.0;
+
+    // Days since posting
+    final daysSince = DateTime.now().difference(posting.postedAt).inDays;
+    final urgencyLabel = daysSince == 0
+        ? 'Posted today'
+        : daysSince == 1
+            ? 'Posted yesterday'
+            : 'Posted $daysSince days ago';
+    final urgencyColor = daysSince <= 3
+        ? const Color(0xFF10B981)
+        : daysSince <= 7
+            ? const Color(0xFFF59E0B)
+            : AppColors.mutedText;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
         child: Container(
-          padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: isDark ? Colors.white.withOpacity(0.06) : Colors.white.withOpacity(0.85),
+            color: isDark
+                ? Colors.white.withOpacity(0.06)
+                : Colors.white.withOpacity(0.85),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-                color: isDark ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.7)),
+                color: isDark
+                    ? Colors.white.withOpacity(0.08)
+                    : Colors.white.withOpacity(0.7)),
             boxShadow: [
               BoxShadow(
                   color: AppColors.wisteria.withOpacity(0.06),
@@ -543,225 +631,365 @@ class _ListingCard extends StatelessWidget {
                   offset: const Offset(0, 4))
             ],
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Title row
-              Row(
-                children: [
-                  Expanded(
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Left accent border
+                Container(
+                  width: 4,
+                  decoration: BoxDecoration(
+                    color: accentColor,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      bottomLeft: Radius.circular(20),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(18),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(posting.title,
-                            style: TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.w800, color: textColor)),
-                        const SizedBox(height: 4),
-                        Wrap(
-                          spacing: 6,
+                        // Title row
+                        Row(
                           children: [
-                            _PostingChip(
-                                label: posting.type, color: AppColors.splashPurple,
-                                bg: AppColors.wisteria.withOpacity(0.1)),
-                            _PostingChip(
-                                label: posting.workStyle == 'remote'
-                                    ? 'Remote'
-                                    : posting.workStyle == 'onsite'
-                                        ? 'On-site'
-                                        : 'Hybrid',
-                                color: const Color(0xFF8B6914),
-                                bg: AppColors.sunglow.withOpacity(0.12)),
-                            _PostingChip(
-                                label: '\$${posting.salaryMin}–${posting.salaryMax}/mo',
-                                color: AppColors.splashPurple,
-                                bg: AppColors.splashPurple.withOpacity(0.06)),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      GestureDetector(
-                        onTap: onToggleStatus,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: statusColor.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: statusColor.withOpacity(0.3)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 6, height: 6,
-                                decoration: BoxDecoration(
-                                    color: statusColor, shape: BoxShape.circle),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(posting.title,
+                                      style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w800,
+                                          color: textColor)),
+                                  const SizedBox(height: 4),
+                                  Wrap(
+                                    spacing: 6,
+                                    children: [
+                                      _PostingChip(
+                                          label: posting.type,
+                                          color: AppColors.splashPurple,
+                                          bg: AppColors.wisteria.withOpacity(0.1)),
+                                      _PostingChip(
+                                          label: posting.workStyle == 'remote'
+                                              ? 'Remote'
+                                              : posting.workStyle == 'onsite'
+                                                  ? 'On-site'
+                                                  : 'Hybrid',
+                                          color: const Color(0xFF8B6914),
+                                          bg: AppColors.sunglow.withOpacity(0.12)),
+                                      _PostingChip(
+                                          label:
+                                              '\$${posting.salaryMin}–${posting.salaryMax}/mo',
+                                          color: AppColors.splashPurple,
+                                          bg: AppColors.splashPurple.withOpacity(0.06)),
+                                    ],
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 5),
-                              Text(isActive ? 'Active' : 'Paused',
-                                  style: TextStyle(
-                                      fontSize: 11, fontWeight: FontWeight.w700,
-                                      color: statusColor)),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text('${posting.viewCount} views',
-                          style: const TextStyle(fontSize: 11, color: AppColors.mutedText)),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              // Pipeline progress
-              if (posting.applicantCount > 0) ...[
-                Row(
-                  children: [
-                    Text('${posting.applicantCount} applicant${posting.applicantCount == 1 ? '' : 's'}',
-                        style: TextStyle(
-                            fontSize: 13, fontWeight: FontWeight.w700, color: textColor)),
-                    const Spacer(),
-                    if (posting.newCount > 0)
-                      _PipelineBadge(count: posting.newCount, label: 'New', color: AppColors.wisteria),
-                    const SizedBox(width: 6),
-                    if (posting.interviewCount > 0)
-                      _PipelineBadge(
-                          count: posting.interviewCount,
-                          label: 'Interview',
-                          color: const Color(0xFF10B981)),
-                    const SizedBox(width: 6),
-                    if (posting.offerCount > 0)
-                      _PipelineBadge(
-                          count: posting.offerCount, label: 'Offer', color: AppColors.sunglow),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                // Multi-bar progress
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: Stack(
-                    children: [
-                      Container(
-                          height: 6,
-                          decoration: BoxDecoration(
-                              color: AppColors.mutedText.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(4))),
-                      FractionallySizedBox(
-                        widthFactor: reviewingPct.clamp(0, 1),
-                        child: Container(
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF59E0B),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
-                      ),
-                      FractionallySizedBox(
-                        widthFactor: interviewPct.clamp(0, 1),
-                        child: Container(
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF10B981),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    _ProgressLegend(color: AppColors.wisteria, label: 'Applied'),
-                    const SizedBox(width: 10),
-                    _ProgressLegend(color: const Color(0xFFF59E0B), label: 'Reviewing'),
-                    const SizedBox(width: 10),
-                    _ProgressLegend(color: const Color(0xFF10B981), label: 'Interview'),
-                  ],
-                ),
-                const SizedBox(height: 14),
-              ] else ...[
-                Container(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(
-                    color: AppColors.mutedText.withOpacity(0.05),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.hourglass_empty_rounded, size: 14, color: AppColors.mutedText),
-                      SizedBox(width: 6),
-                      Text('No applicants yet',
-                          style: TextStyle(fontSize: 12, color: AppColors.mutedText)),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-              ],
-              // Actions
-              Row(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: GestureDetector(
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        onViewApplicants();
-                      },
-                      child: Container(
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: AppColors.darkPurple,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                                color: AppColors.darkPurple.withOpacity(0.25),
-                                blurRadius: 8,
-                                offset: const Offset(0, 3))
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.people_rounded, size: 14, color: Colors.white),
-                            const SizedBox(width: 6),
-                            Text(
-                              'View Applicants${posting.applicantCount > 0 ? ' (${posting.applicantCount})' : ''}',
-                              style: const TextStyle(
-                                  fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
+                            ),
+                            const SizedBox(width: 12),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                GestureDetector(
+                                  onTap: onToggleStatus,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 5),
+                                    decoration: BoxDecoration(
+                                      color: statusColor.withOpacity(0.12),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                          color: statusColor.withOpacity(0.3)),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          width: 6, height: 6,
+                                          decoration: BoxDecoration(
+                                              color: statusColor,
+                                              shape: BoxShape.circle),
+                                        ),
+                                        const SizedBox(width: 5),
+                                        Text(isActive ? 'Active' : 'Paused',
+                                            style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w700,
+                                                color: statusColor)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text('${posting.viewCount} views',
+                                    style: const TextStyle(
+                                        fontSize: 11, color: AppColors.mutedText)),
+                              ],
                             ),
                           ],
                         ),
-                      ),
+                        const SizedBox(height: 10),
+                        // Urgency row
+                        Row(
+                          children: [
+                            Icon(Icons.schedule_rounded,
+                                size: 12, color: urgencyColor),
+                            const SizedBox(width: 4),
+                            Text(urgencyLabel,
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: urgencyColor)),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        // Pipeline section
+                        if (posting.applicantCount > 0) ...[
+                          Row(
+                            children: [
+                              Text(
+                                '${posting.applicantCount} applicant${posting.applicantCount == 1 ? '' : 's'}',
+                                style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: textColor),
+                              ),
+                              const Spacer(),
+                              // Numbered circle pipeline
+                              _PipelineCircle(
+                                  count: posting.newCount,
+                                  label: 'New',
+                                  color: AppColors.wisteria),
+                              const SizedBox(width: 6),
+                              _PipelineCircle(
+                                  count: posting.reviewingCount,
+                                  label: 'Review',
+                                  color: const Color(0xFFF59E0B)),
+                              const SizedBox(width: 6),
+                              _PipelineCircle(
+                                  count: posting.interviewCount,
+                                  label: 'Interview',
+                                  color: const Color(0xFF10B981)),
+                              const SizedBox(width: 6),
+                              _PipelineCircle(
+                                  count: posting.offerCount,
+                                  label: 'Offer',
+                                  color: AppColors.sunglow),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: Stack(
+                              children: [
+                                Container(
+                                    height: 6,
+                                    decoration: BoxDecoration(
+                                        color: AppColors.mutedText.withOpacity(0.12),
+                                        borderRadius: BorderRadius.circular(4))),
+                                FractionallySizedBox(
+                                  widthFactor: reviewingPct.clamp(0, 1),
+                                  child: Container(
+                                    height: 6,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF59E0B),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                  ),
+                                ),
+                                FractionallySizedBox(
+                                  widthFactor: interviewPct.clamp(0, 1),
+                                  child: Container(
+                                    height: 6,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF10B981),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              _ProgressLegend(
+                                  color: AppColors.wisteria, label: 'Applied'),
+                              const SizedBox(width: 10),
+                              _ProgressLegend(
+                                  color: const Color(0xFFF59E0B),
+                                  label: 'Reviewing'),
+                              const SizedBox(width: 10),
+                              _ProgressLegend(
+                                  color: const Color(0xFF10B981),
+                                  label: 'Interview'),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                        ] else ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: AppColors.mutedText.withOpacity(0.05),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.hourglass_empty_rounded,
+                                    size: 14, color: AppColors.mutedText),
+                                SizedBox(width: 6),
+                                Text('No applicants yet',
+                                    style: TextStyle(
+                                        fontSize: 12, color: AppColors.mutedText)),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                        ],
+                        // Actions
+                        if (posting.applicantCount > 0) ...[
+                          // Full-width view button when there are applicants
+                          GestureDetector(
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                              onViewApplicants();
+                            },
+                            child: Container(
+                              width: double.infinity,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: AppColors.darkPurple,
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: [
+                                  BoxShadow(
+                                      color:
+                                          AppColors.darkPurple.withOpacity(0.25),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 3))
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.people_rounded,
+                                      size: 14, color: Colors.white),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'View ${posting.applicantCount} Applicant${posting.applicantCount == 1 ? '' : 's'}',
+                                    style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.white),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  const Icon(Icons.arrow_forward_rounded,
+                                      size: 14, color: Colors.white),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              _SmallActionBtn(
+                                  icon: Icons.edit_outlined,
+                                  color: AppColors.wisteria,
+                                  isDark: isDark,
+                                  onTap: onEdit),
+                              const SizedBox(width: 8),
+                              _SmallActionBtn(
+                                  icon: isActive
+                                      ? Icons.pause_rounded
+                                      : Icons.play_arrow_rounded,
+                                  color: isActive
+                                      ? const Color(0xFFF59E0B)
+                                      : const Color(0xFF10B981),
+                                  isDark: isDark,
+                                  onTap: onToggleStatus),
+                              const SizedBox(width: 8),
+                              _SmallActionBtn(
+                                  icon: Icons.delete_outline_rounded,
+                                  color: Colors.redAccent,
+                                  isDark: isDark,
+                                  onTap: onDelete),
+                            ],
+                          ),
+                        ] else ...[
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: 2,
+                                child: GestureDetector(
+                                  onTap: () {
+                                    HapticFeedback.lightImpact();
+                                    onViewApplicants();
+                                  },
+                                  child: Container(
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.darkPurple,
+                                      borderRadius: BorderRadius.circular(12),
+                                      boxShadow: [
+                                        BoxShadow(
+                                            color: AppColors.darkPurple
+                                                .withOpacity(0.25),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 3))
+                                      ],
+                                    ),
+                                    child: const Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.people_rounded,
+                                            size: 14, color: Colors.white),
+                                        SizedBox(width: 6),
+                                        Text('View Applicants',
+                                            style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w700,
+                                                color: Colors.white)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              _SmallActionBtn(
+                                  icon: Icons.edit_outlined,
+                                  color: AppColors.wisteria,
+                                  isDark: isDark,
+                                  onTap: onEdit),
+                              const SizedBox(width: 8),
+                              _SmallActionBtn(
+                                  icon: isActive
+                                      ? Icons.pause_rounded
+                                      : Icons.play_arrow_rounded,
+                                  color: isActive
+                                      ? const Color(0xFFF59E0B)
+                                      : const Color(0xFF10B981),
+                                  isDark: isDark,
+                                  onTap: onToggleStatus),
+                              const SizedBox(width: 8),
+                              _SmallActionBtn(
+                                  icon: Icons.delete_outline_rounded,
+                                  color: Colors.redAccent,
+                                  isDark: isDark,
+                                  onTap: onDelete),
+                            ],
+                          ),
+                        ],
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  _SmallActionBtn(
-                      icon: Icons.edit_outlined,
-                      color: AppColors.wisteria,
-                      isDark: isDark,
-                      onTap: onEdit),
-                  const SizedBox(width: 8),
-                  _SmallActionBtn(
-                      icon: isActive ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                      color: isActive ? const Color(0xFFF59E0B) : const Color(0xFF10B981),
-                      isDark: isDark,
-                      onTap: onToggleStatus),
-                  const SizedBox(width: 8),
-                  _SmallActionBtn(
-                      icon: Icons.delete_outline_rounded,
-                      color: Colors.redAccent,
-                      isDark: isDark,
-                      onTap: onDelete),
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -783,22 +1011,46 @@ class _PostingChip extends StatelessWidget {
       );
 }
 
-class _PipelineBadge extends StatelessWidget {
+class _PipelineCircle extends StatelessWidget {
   final int count;
   final String label;
   final Color color;
-  const _PipelineBadge({required this.count, required this.label, required this.color});
+  const _PipelineCircle(
+      {required this.count, required this.label, required this.color});
+
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.12),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Text('$count $label',
-            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color)),
+  Widget build(BuildContext context) => Column(
+        children: [
+          Container(
+            width: 28, height: 28,
+            decoration: BoxDecoration(
+              color: count > 0
+                  ? color.withOpacity(0.15)
+                  : AppColors.mutedText.withOpacity(0.08),
+              shape: BoxShape.circle,
+              border: Border.all(
+                  color: count > 0
+                      ? color.withOpacity(0.4)
+                      : AppColors.mutedText.withOpacity(0.15)),
+            ),
+            child: Center(
+              child: Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: count > 0 ? color : AppColors.mutedText,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(label,
+              style: const TextStyle(fontSize: 9, color: AppColors.mutedText)),
+        ],
       );
 }
+
 
 class _ProgressLegend extends StatelessWidget {
   final Color color;

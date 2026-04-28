@@ -197,6 +197,29 @@ class JobsStore {
       'saved': false,
       'category': 'Software Dev',
       'workStyle': 'remote',
+      'description':
+          'Alif.tj is Tajikistan\'s leading fintech company, serving over 2 million customers '
+          'with mobile banking, lending, and e-commerce solutions. We are looking for a '
+          'skilled Flutter developer to join our mobile engineering team and help us build '
+          'the next generation of our flagship app.\n\n'
+          'You will collaborate with product designers and backend engineers to ship polished, '
+          'performant features to both iOS and Android simultaneously. Our stack is Firebase + '
+          'custom REST APIs, and we ship fast — at least two production releases per month.',
+      'requirements': [
+        '2+ years Flutter / Dart experience in production apps',
+        'Proficiency with Firebase (Auth, Firestore, Storage)',
+        'State management mastery: Provider, Bloc, or Riverpod',
+        'Clean architecture knowledge (feature-first or layered)',
+        'Experience integrating REST and WebSocket APIs',
+        'Published apps on Play Store or App Store is a strong plus',
+      ],
+      'benefits': [
+        'Fully remote — work from anywhere in Tajikistan',
+        'Competitive salary reviewed every 6 months',
+        'Annual learning budget: \$500 for courses and conferences',
+        'Health insurance for you and your family',
+        '25 days paid vacation + public holidays',
+      ],
     },
     {
       'title': 'UI/UX Designer',
@@ -211,6 +234,29 @@ class JobsStore {
       'saved': false,
       'category': 'Design',
       'workStyle': 'onsite',
+      'description':
+          'DushanbeIT is a fast-growing product studio building SaaS tools and marketplaces '
+          'for Central Asian businesses. We are searching for a product-minded UI/UX designer '
+          'who takes pride in the details.\n\n'
+          'You will own end-to-end design for two products: a B2B logistics platform and a '
+          'consumer marketplace. You\'ll run discovery sessions, produce wireframes and '
+          'high-fidelity Figma prototypes, and work closely with front-end engineers during '
+          'implementation to ensure pixel-perfect delivery.',
+      'requirements': [
+        'Figma mastery — components, auto-layout, and variables',
+        'Mobile-first design experience for iOS and Android',
+        'Strong portfolio with at least 2 full case studies',
+        'Experience conducting user interviews and usability tests',
+        'Working knowledge of HTML/CSS to communicate with devs',
+        'Prior experience with design systems is a plus',
+      ],
+      'benefits': [
+        'Modern office in the heart of Dushanbe',
+        'Latest MacBook Pro and external display',
+        'Adobe CC and Figma Professional licenses',
+        'Bi-annual team retreats',
+        'Flexible working hours (core hours 10:00–16:00)',
+      ],
     },
     {
       'title': 'Marketing Manager',
@@ -225,6 +271,27 @@ class JobsStore {
       'saved': true,
       'category': 'Marketing',
       'workStyle': 'onsite',
+      'description':
+          'TajTelecom is the national telecommunications provider connecting over 8 million '
+          'people across Tajikistan. As Marketing Manager you will lead a team of five '
+          'specialists driving brand awareness, subscriber growth, and retention across '
+          'digital and traditional channels.\n\n'
+          'This is a senior individual-contributor role with a clear path to Head of Marketing '
+          'within 18 months.',
+      'requirements': [
+        '4+ years in B2C marketing, ideally in telecoms or consumer tech',
+        'Hands-on experience with Google Ads, Meta Ads, and programmatic DSPs',
+        'Strong analytical skills — comfortable in Google Analytics and Power BI',
+        'Experience managing creative agencies and production timelines',
+        'Fluent in Tajik and Russian; English is a plus',
+      ],
+      'benefits': [
+        'Generous bonus tied to subscriber growth KPIs',
+        'Free TajTelecom unlimited plan for you and your family',
+        'Corporate car allowance',
+        'Leadership training programme',
+        'Paid professional certifications (Google, Meta)',
+      ],
     },
     {
       'title': 'Financial Analyst',
@@ -239,6 +306,28 @@ class JobsStore {
       'saved': false,
       'category': 'Finance',
       'workStyle': 'onsite',
+      'description':
+          'Bank Eskhata is one of Tajikistan\'s top-tier commercial banks, offering retail, '
+          'SME, and corporate financial products. The Financial Analyst role sits within the '
+          'Corporate Finance team and focuses on credit analysis, financial modelling, and '
+          'investment appraisal for loan portfolios up to \$5M.\n\n'
+          'You will prepare detailed credit memos, support relationship managers with client '
+          'due diligence, and contribute to the bank\'s quarterly financial reporting.',
+      'requirements': [
+        'Bachelor\'s degree in Finance, Economics, or Accounting',
+        '2+ years financial analysis experience in banking or consulting',
+        'Advanced Excel and financial modelling skills (DCF, LBO basics)',
+        'Familiarity with IFRS accounting standards',
+        'CFA Level I is a strong advantage',
+        'Fluency in Russian; English is beneficial',
+      ],
+      'benefits': [
+        'Competitive salary plus performance bonus up to 30%',
+        'Subsidised mortgage rate for bank employees',
+        'Comprehensive health and dental insurance',
+        'Sponsored CFA or ACCA study programme',
+        '20 days annual leave',
+      ],
     },
     {
       'title': 'Backend Engineer',
@@ -253,6 +342,29 @@ class JobsStore {
       'saved': false,
       'category': 'Software Dev',
       'workStyle': 'remote',
+      'description':
+          'iPayments is building a modern payment infrastructure for Central Asia, enabling '
+          'merchants and consumers to transact via cards, wallets, and BNPL. We are looking '
+          'for a senior backend contract engineer to help us scale our API platform to handle '
+          '100k+ transactions per day.\n\n'
+          'This is a 6-month contract with strong likelihood of extension or conversion to a '
+          'permanent role. You will work autonomously, own several service areas, and report '
+          'directly to the CTO.',
+      'requirements': [
+        '3+ years backend experience in Python (FastAPI) or Node.js (Express)',
+        'Strong PostgreSQL skills — query optimisation, indexing, migrations',
+        'Experience designing RESTful and WebSocket APIs at scale',
+        'Redis for caching and rate limiting',
+        'Docker and CI/CD pipelines (GitHub Actions or GitLab CI)',
+        'Basic knowledge of PCI-DSS compliance is a plus',
+      ],
+      'benefits': [
+        '100% remote — async-first culture',
+        'Competitive hourly rate paid in USD',
+        'Flexible hours — deliverable-focused, not hours-tracked',
+        'Modern tooling: linear, Notion, Slack, GitHub',
+        'Option to extend or convert to a permanent position',
+      ],
     },
     {
       'title': 'Content Creator',
@@ -267,6 +379,26 @@ class JobsStore {
       'saved': false,
       'category': 'Marketing',
       'workStyle': 'remote',
+      'description':
+          'MediaTJ is the largest digital media group in Tajikistan, operating news portals, '
+          'YouTube channels, and Instagram pages with a combined following of 3.5 million. '
+          'We need a creative Content Creator to produce engaging short-form video and '
+          'written content for our social channels.\n\n'
+          'This is a part-time remote role averaging 20 hours per week, ideal for a creative '
+          'professional looking to build a portfolio while maintaining flexibility.',
+      'requirements': [
+        '1+ year experience creating content for Instagram or TikTok',
+        'Video editing skills (CapCut, Adobe Premiere, or DaVinci)',
+        'Strong written Tajik and Russian; English is a bonus',
+        'Understanding of social media algorithms and best practices',
+        'Ability to generate and pitch original content ideas weekly',
+      ],
+      'benefits': [
+        'Work from anywhere, fully remote',
+        'Creative freedom — we trust your ideas',
+        'Equipment allowance for camera and accessories',
+        'Growing team with mentorship from senior editors',
+      ],
     },
     {
       'title': 'Sales Representative',
@@ -281,6 +413,28 @@ class JobsStore {
       'saved': false,
       'category': 'Sales',
       'workStyle': 'onsite',
+      'description':
+          'Somoni Motors is the authorised dealer for leading automotive brands in Tajikistan, '
+          'with three showrooms in Dushanbe and Khujand. We are expanding our sales team and '
+          'looking for a motivated Sales Representative to help customers find their perfect '
+          'vehicle.\n\n'
+          'You will manage inbound leads, conduct showroom presentations, arrange test drives, '
+          'and guide customers through the financing and delivery process.',
+      'requirements': [
+        '1+ year sales or customer-facing experience (automotive is a plus)',
+        'Excellent interpersonal and negotiation skills',
+        'Fluent in Tajik and Russian',
+        'Valid driver\'s licence',
+        'Comfortable using CRM software',
+        'Target-driven with a positive, resilient attitude',
+      ],
+      'benefits': [
+        'Uncapped commission — top performers earn \$1,500+/mo',
+        'Company vehicle for business use',
+        'Product training provided by brand manufacturers',
+        'Health insurance',
+        'Regular team incentives and prizes',
+      ],
     },
     {
       'title': 'Product Manager',
@@ -295,6 +449,29 @@ class JobsStore {
       'saved': false,
       'category': 'Operations',
       'workStyle': 'onsite',
+      'description':
+          'TechHub TJ is a startup accelerator and co-working space that has launched 14 '
+          'startups in the past three years. We are spinning up a new SaaS product for the '
+          'HR/payroll vertical and need an experienced Product Manager to lead it from zero '
+          'to one.\n\n'
+          'You will define the product vision, own the roadmap, work daily with engineering '
+          'and design, and talk to customers every week. This is a high-ownership, '
+          'high-impact role.',
+      'requirements': [
+        '3+ years PM experience in a B2B SaaS environment',
+        'Strong track record shipping products users love',
+        'Excellent user-story writing and backlog management skills',
+        'Comfortable with SQL and basic data analysis to measure outcomes',
+        'Experience running A/B tests and interpreting results',
+        'Exceptional communication skills in English and Russian',
+      ],
+      'benefits': [
+        'Equity participation in the product you build',
+        'Co-working access at TechHub TJ campus',
+        'Annual conference and travel budget',
+        'Private health insurance',
+        'Flexible PTO policy',
+      ],
     },
     {
       'title': 'Data Analyst',
@@ -309,6 +486,27 @@ class JobsStore {
       'saved': false,
       'category': 'Finance',
       'workStyle': 'remote',
+      'description':
+          'Alif Academy is an online education platform with 200,000+ active learners across '
+          'Central Asia. We are hiring a Data Analyst to turn our rich learner behaviour data '
+          'into actionable insights that drive course completion rates, retention, and revenue.\n\n'
+          'You will build dashboards, run ad-hoc analyses, and partner with the product and '
+          'marketing teams on data-informed decisions.',
+      'requirements': [
+        '2+ years data analysis experience',
+        'Advanced SQL — window functions, CTEs, query optimisation',
+        'Proficiency in Python (pandas, matplotlib) or R',
+        'Experience with BI tools: Metabase, Tableau, or Looker',
+        'Strong statistical intuition — A/B testing, cohort analysis',
+        'Experience with a cloud data warehouse (BigQuery, Redshift, or Snowflake) is a plus',
+      ],
+      'benefits': [
+        'Fully remote with flexible hours',
+        'Free access to all Alif Academy courses',
+        'Quarterly data team offsites',
+        'Paid subscriptions to data tools and learning platforms',
+        'Annual salary review',
+      ],
     },
     {
       'title': 'HR Manager',
@@ -323,6 +521,29 @@ class JobsStore {
       'saved': false,
       'category': 'HR',
       'workStyle': 'onsite',
+      'description':
+          'Orienbank is one of the fastest-growing retail banks in Tajikistan with 1,200 '
+          'employees across 40 branches. We are looking for an experienced HR Manager to '
+          'lead talent acquisition and employee development for our Dushanbe headquarters '
+          'team of 300 people.\n\n'
+          'You will manage the full recruitment lifecycle, run onboarding programmes, '
+          'coordinate performance review cycles, and champion a positive culture that '
+          'attracts and retains top talent.',
+      'requirements': [
+        '3+ years HR management experience, preferably in financial services',
+        'Proven track record recruiting at scale (100+ hires per year)',
+        'Strong knowledge of Tajik labour law',
+        'Experience designing and running performance management systems',
+        'CIPD or SHRM certification is a plus',
+        'Excellent communication in Tajik, Russian, and ideally English',
+      ],
+      'benefits': [
+        'Competitive salary with annual review',
+        'Subsidised canteen and on-site gym',
+        'Professional HR certification support',
+        'Internal promotion programme',
+        'Comprehensive health insurance',
+      ],
     },
   ];
 

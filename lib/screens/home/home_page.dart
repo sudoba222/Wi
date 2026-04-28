@@ -14,6 +14,7 @@ import '../../models/user_profile.dart';
 import '../profile/profile_page.dart';
 import '../settings/about_page.dart';
 import '../settings/help_support_page.dart';
+import '../settings/admin_reports_page.dart';
 import 'feed_page.dart';
 import 'job_page.dart';
 import 'messages_page.dart';
@@ -244,6 +245,18 @@ class _AppDrawer extends StatelessWidget {
                     onTap: () async { Navigator.pop(context); await Navigator.push(context, MaterialPageRoute(builder: (_) => const AboutPage())); }),
 
                   _Div(isDark: isDark),
+
+                  // Admin panel (only visible to admin)
+                  if (auth.currentUser?.email == kAdminEmail) ...[
+                    _Tile(
+                      icon: Icons.admin_panel_settings_rounded,
+                      label: 'Admin Panel',
+                      textColor: AppColors.sunglow,
+                      iconColor: AppColors.sunglow,
+                      onTap: () async { Navigator.pop(context); await Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminReportsPage())); },
+                    ),
+                    _Div(isDark: isDark),
+                  ],
 
                   // Sign out in red
                   _Tile(icon: Icons.logout_rounded, label: lang.t('signOut'), textColor: Colors.red, iconColor: Colors.red,

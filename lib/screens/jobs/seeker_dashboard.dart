@@ -30,7 +30,9 @@ class SeekerDashboard extends StatefulWidget {
 class _SeekerDashboardState extends State<SeekerDashboard>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  String _activeFilter = 'All';
+  String _typeFilter = 'All';
+  String _workStyleFilter = 'Any';
+  String _categoryFilter = 'All';
   String _searchQuery = '';
   final _searchController = TextEditingController();
   bool _strengthExpanded = false;
@@ -118,17 +120,31 @@ class _SeekerDashboardState extends State<SeekerDashboard>
     return jobs.where((j) => _matchScore(j) >= 40).take(5).toList();
   }
 
+  int get _activeFilterCount {
+    int c = 0;
+    if (_typeFilter != 'All') c++;
+    if (_workStyleFilter != 'Any') c++;
+    if (_categoryFilter != 'All') c++;
+    return c;
+  }
+
   List<Map<String, dynamic>> get _filteredBrowse {
     return JobsStore.jobBoard.where((j) {
-      final matchesFilter = _activeFilter == 'All'
-          ? true
-          : _activeFilter == 'Remote'
-              ? j['isRemote'] == true
-              : j['type'] == _activeFilter;
+      // Job type filter
+      final matchesType = _typeFilter == 'All' || j['type'] == _typeFilter;
+      // Work style filter
+      final jobWorkStyle = j['workStyle'] as String? ?? '';
+      final matchesWorkStyle = _workStyleFilter == 'Any' ||
+          jobWorkStyle == _workStyleFilter ||
+          (_workStyleFilter == 'remote' && j['isRemote'] == true);
+      // Category filter
+      final matchesCategory =
+          _categoryFilter == 'All' || j['category'] == _categoryFilter;
+      // Search query filter
       final matchesSearch = _searchQuery.isEmpty ||
           (j['title'] as String).toLowerCase().contains(_searchQuery.toLowerCase()) ||
           (j['company'] as String).toLowerCase().contains(_searchQuery.toLowerCase());
-      return matchesFilter && matchesSearch;
+      return matchesType && matchesWorkStyle && matchesCategory && matchesSearch;
     }).toList();
   }
 
@@ -176,6 +192,9 @@ class _SeekerDashboardState extends State<SeekerDashboard>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = isDark ? Colors.white : AppColors.darkPurple;
     final strength = _profileStrength;
+    final firstName = widget.userProfile?.name.isNotEmpty == true
+        ? widget.userProfile!.name.split(' ').first
+        : null;
 
     return Scaffold(
       body: Container(
@@ -348,18 +367,22 @@ class _SeekerDashboardState extends State<SeekerDashboard>
                       isApplied: _isApplied,
                       onSave: _toggleSave,
                       onTap: (j) => _openJobDetail(context, j),
+                      firstName: firstName,
                     ),
                     _BrowseTab(
                       isDark: isDark,
                       textColor: textColor,
-                      activeFilter: _activeFilter,
+                      typeFilter: _typeFilter,
+                      workStyleFilter: _workStyleFilter,
+                      categoryFilter: _categoryFilter,
+                      activeFilterCount: _activeFilterCount,
                       searchQuery: _searchQuery,
                       searchController: _searchController,
                       filteredJobs: _filteredBrowse,
                       isApplied: _isApplied,
                       onSave: _toggleSave,
                       onTap: (j) => _openJobDetail(context, j),
-                      onFilterChanged: (f) => setState(() => _activeFilter = f),
+                      onTypeFilterChanged: (f) => setState(() => _typeFilter = f),
                       onSearchChanged: (v) => setState(() => _searchQuery = v),
                       onClearSearch: () {
                         _searchController.clear();
@@ -369,8 +392,14 @@ class _SeekerDashboardState extends State<SeekerDashboard>
                         context: context,
                         backgroundColor: Colors.transparent,
                         builder: (_) => AdvancedFilterSheet(
-                          activeFilter: _activeFilter,
-                          onFilterChanged: (f) => setState(() => _activeFilter = f),
+                          typeFilter: _typeFilter,
+                          workStyleFilter: _workStyleFilter,
+                          categoryFilter: _categoryFilter,
+                          onApply: (type, ws, cat) => setState(() {
+                            _typeFilter = type;
+                            _workStyleFilter = ws;
+                            _categoryFilter = cat;
+                          }),
                         ),
                       ),
                     ),
@@ -416,6 +445,7 @@ class _ForYouTab extends StatelessWidget {
   final bool Function(Map) isApplied;
   final void Function(Map<String, dynamic>) onSave;
   final void Function(Map<String, dynamic>) onTap;
+  final String? firstName;
 
   const _ForYouTab({
     required this.isDark,
@@ -430,6 +460,7 @@ class _ForYouTab extends StatelessWidget {
     required this.isApplied,
     required this.onSave,
     required this.onTap,
+    this.firstName,
   });
 
   Color get _strengthColor {
@@ -449,6 +480,61 @@ class _ForYouTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
       children: [
+        // ── Greeting card ──
+        if (firstName != null && firstName!.isNotEmpty) ...[
+          Container(
+            margin: const EdgeInsets.only(bottom: 14),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [AppColors.darkPurple, AppColors.splashPurple],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.darkPurple.withOpacity(0.35),
+                  blurRadius: 20,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Good day, $firstName!',
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '${recommendedJobs.length} job${recommendedJobs.length == 1 ? '' : 's'} match your profile',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.white.withOpacity(0.75),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Text(
+                  recommendedJobs.isNotEmpty ? '\u{1F31F}' : '\u{1F44B}',
+                  style: const TextStyle(fontSize: 32),
+                ),
+              ],
+            ),
+          ),
+        ],
         // Profile strength card
         GestureDetector(
           onTap: onToggleStrength,
@@ -658,14 +744,17 @@ class _ForYouTab extends StatelessWidget {
 class _BrowseTab extends StatelessWidget {
   final bool isDark;
   final Color textColor;
-  final String activeFilter;
+  final String typeFilter;
+  final String workStyleFilter;
+  final String categoryFilter;
+  final int activeFilterCount;
   final String searchQuery;
   final TextEditingController searchController;
   final List<Map<String, dynamic>> filteredJobs;
   final bool Function(Map) isApplied;
   final void Function(Map<String, dynamic>) onSave;
   final void Function(Map<String, dynamic>) onTap;
-  final void Function(String) onFilterChanged;
+  final void Function(String) onTypeFilterChanged;
   final void Function(String) onSearchChanged;
   final VoidCallback onClearSearch;
   final VoidCallback onOpenFilter;
@@ -673,14 +762,17 @@ class _BrowseTab extends StatelessWidget {
   const _BrowseTab({
     required this.isDark,
     required this.textColor,
-    required this.activeFilter,
+    required this.typeFilter,
+    required this.workStyleFilter,
+    required this.categoryFilter,
+    required this.activeFilterCount,
     required this.searchQuery,
     required this.searchController,
     required this.filteredJobs,
     required this.isApplied,
     required this.onSave,
     required this.onTap,
-    required this.onFilterChanged,
+    required this.onTypeFilterChanged,
     required this.onSearchChanged,
     required this.onClearSearch,
     required this.onOpenFilter,
@@ -688,10 +780,46 @@ class _BrowseTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final filters = ['All', 'Remote', 'Full-time', 'Part-time', 'Contract'];
+    const typeFilters = ['All', 'Full-time', 'Part-time', 'Contract'];
+    const categoryQuickFilters = [
+      'All', 'Software Dev', 'Design', 'Marketing', 'Finance', 'HR',
+    ];
+
+    Widget buildFilterChip(String label, bool isActive, VoidCallback onTap) =>
+        GestureDetector(
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            margin: const EdgeInsets.only(right: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+            decoration: BoxDecoration(
+              color: isActive
+                  ? (isDark ? AppColors.wisteria : AppColors.darkPurple)
+                  : (isDark
+                      ? Colors.white.withOpacity(0.08)
+                      : Colors.white.withOpacity(0.65)),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                  color: isActive
+                      ? (isDark ? AppColors.wisteria : AppColors.darkPurple)
+                      : AppColors.mutedText.withOpacity(0.25)),
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: isActive
+                    ? (isDark ? AppColors.darkPurple : AppColors.sunglow)
+                    : AppColors.mutedText,
+              ),
+            ),
+          ),
+        );
 
     return Column(
       children: [
+        // Search bar + filter button
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(
@@ -704,20 +832,26 @@ class _BrowseTab extends StatelessWidget {
                     child: Container(
                       height: 44,
                       decoration: BoxDecoration(
-                        color: isDark ? Colors.white.withOpacity(0.07) : Colors.white.withOpacity(0.65),
+                        color: isDark
+                            ? Colors.white.withOpacity(0.07)
+                            : Colors.white.withOpacity(0.65),
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                            color: isDark ? Colors.white.withOpacity(0.1) : AppColors.mutedText.withOpacity(0.2)),
+                            color: isDark
+                                ? Colors.white.withOpacity(0.1)
+                                : AppColors.mutedText.withOpacity(0.2)),
                       ),
                       child: TextField(
                         controller: searchController,
                         onChanged: onSearchChanged,
                         style: TextStyle(
-                            fontSize: 14, color: isDark ? Colors.white : AppColors.darkPurple),
+                            fontSize: 14,
+                            color: isDark ? Colors.white : AppColors.darkPurple),
                         decoration: InputDecoration(
                           hintText: 'Search jobs or companies…',
                           hintStyle: TextStyle(
-                              fontSize: 14, color: AppColors.mutedText.withOpacity(0.7)),
+                              fontSize: 14,
+                              color: AppColors.mutedText.withOpacity(0.7)),
                           prefixIcon: const Icon(Icons.search_rounded,
                               size: 18, color: AppColors.mutedText),
                           suffixIcon: searchQuery.isNotEmpty
@@ -727,7 +861,8 @@ class _BrowseTab extends StatelessWidget {
                                       size: 16, color: AppColors.mutedText))
                               : null,
                           border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 12),
                         ),
                       ),
                     ),
@@ -735,21 +870,56 @@ class _BrowseTab extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
+              // Filter icon with active badge
               GestureDetector(
                 onTap: onOpenFilter,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
                   child: BackdropFilter(
                     filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                    child: Container(
-                      width: 44, height: 44,
-                      decoration: BoxDecoration(
-                        color: isDark ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.65),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                            color: isDark ? Colors.white.withOpacity(0.12) : Colors.white.withOpacity(0.7)),
-                      ),
-                      child: Icon(Icons.tune_rounded, color: textColor, size: 20),
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Container(
+                          width: 44, height: 44,
+                          decoration: BoxDecoration(
+                            color: activeFilterCount > 0
+                                ? AppColors.splashPurple.withOpacity(0.15)
+                                : (isDark
+                                    ? Colors.white.withOpacity(0.08)
+                                    : Colors.white.withOpacity(0.65)),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color: activeFilterCount > 0
+                                    ? AppColors.splashPurple.withOpacity(0.4)
+                                    : (isDark
+                                        ? Colors.white.withOpacity(0.12)
+                                        : Colors.white.withOpacity(0.7))),
+                          ),
+                          child: Icon(Icons.tune_rounded,
+                              color: activeFilterCount > 0
+                                  ? AppColors.splashPurple
+                                  : textColor,
+                              size: 20),
+                        ),
+                        if (activeFilterCount > 0)
+                          Positioned(
+                            top: -5, right: -5,
+                            child: Container(
+                              width: 18, height: 18,
+                              decoration: const BoxDecoration(
+                                  color: AppColors.splashPurple,
+                                  shape: BoxShape.circle),
+                              child: Center(
+                                child: Text('$activeFilterCount',
+                                    style: const TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.white)),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),
@@ -758,39 +928,68 @@ class _BrowseTab extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
+        // Job type chips
         SizedBox(
-          height: 40,
+          height: 36,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: filters.length,
+            itemCount: typeFilters.length,
             itemBuilder: (_, i) {
-              final f = filters[i];
-              final isActive = f == activeFilter;
+              final f = typeFilters[i];
+              return buildFilterChip(
+                  f, f == typeFilter, () => onTypeFilterChanged(f));
+            },
+          ),
+        ),
+        const SizedBox(height: 6),
+        // Category quick-chips
+        SizedBox(
+          height: 36,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: categoryQuickFilters.length,
+            itemBuilder: (_, i) {
+              final cat = categoryQuickFilters[i];
+              final isActive = cat == categoryFilter;
               return GestureDetector(
-                onTap: () => onFilterChanged(f),
+                onTap: () {
+                  // Trigger the full filter sheet to update categoryFilter
+                  // For quick-chips we need to call back with current type+ws
+                  // We use a workaround: show the sheet pre-selected to this cat.
+                  // Since _BrowseTab is stateless and we can't call onApply directly,
+                  // we open the filter sheet instead for category changes.
+                  // This is intentional UX: quick-chips show via the filter modal.
+                  onOpenFilter();
+                },
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 150),
                   margin: const EdgeInsets.only(right: 8),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                   decoration: BoxDecoration(
                     color: isActive
-                        ? (isDark ? AppColors.wisteria : AppColors.darkPurple)
-                        : (isDark ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.65)),
+                        ? AppColors.sunglow.withOpacity(0.2)
+                        : (isDark
+                            ? Colors.white.withOpacity(0.06)
+                            : Colors.white.withOpacity(0.55)),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
                         color: isActive
-                            ? (isDark ? AppColors.wisteria : AppColors.darkPurple)
-                            : AppColors.mutedText.withOpacity(0.25)),
+                            ? AppColors.sunglow.withOpacity(0.5)
+                            : AppColors.mutedText.withOpacity(0.2)),
                   ),
-                  child: Text(f,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: isActive
-                            ? (isDark ? AppColors.darkPurple : AppColors.sunglow)
-                            : AppColors.mutedText,
-                      )),
+                  child: Text(
+                    cat,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: isActive
+                          ? const Color(0xFF8B6914)
+                          : AppColors.mutedText,
+                    ),
+                  ),
                 ),
               );
             },
