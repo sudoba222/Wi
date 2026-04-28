@@ -1,6 +1,6 @@
 // ignore_for_file: deprecated_member_use
 
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -26,7 +26,8 @@ class _BugReportPageState extends State<BugReportPage>
 
   String _type = 'bug';
   String _priority = 'medium';
-  File? _image;
+  XFile? _ximage;
+  Uint8List? _imageBytes;
   bool _submitting = false;
   bool _submitted = false;
   late AnimationController _checkAnim;
@@ -49,7 +50,10 @@ class _BugReportPageState extends State<BugReportPage>
 
   Future<void> _pickImage() async {
     final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
-    if (picked != null) setState(() => _image = File(picked.path));
+    if (picked != null) {
+      final bytes = await picked.readAsBytes();
+      setState(() { _ximage = picked; _imageBytes = bytes; });
+    }
   }
 
   Future<void> _submit() async {
@@ -70,8 +74,8 @@ class _BugReportPageState extends State<BugReportPage>
       final user = auth.currentUser;
 
       String? imageUrl;
-      if (_image != null) {
-        imageUrl = await _cloudinary.uploadPostImage(_image!);
+      if (_ximage != null && _imageBytes != null) {
+        imageUrl = await _cloudinary.uploadPostImageBytes(_imageBytes!, _ximage!.name);
       }
 
       await FirebaseFirestore.instance.collection('feedback').add({
@@ -286,29 +290,29 @@ class _BugReportPageState extends State<BugReportPage>
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               width: double.infinity,
-              height: _image != null ? 180 : 100,
+              height: _imageBytes != null ? 180 : 100,
               decoration: BoxDecoration(
                 color: isDark ? Colors.white.withOpacity(0.05) : AppColors.background,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: _image != null
+                  color: _imageBytes != null
                       ? AppColors.wisteria.withOpacity(0.5)
                       : AppColors.mutedText.withOpacity(0.25),
                   width: 1.5,
                   style: BorderStyle.solid,
                 ),
               ),
-              child: _image != null
+              child: _imageBytes != null
                   ? Stack(
                       children: [
                         ClipRRect(
                           borderRadius: BorderRadius.circular(15),
-                          child: Image.file(_image!, fit: BoxFit.cover, width: double.infinity, height: double.infinity),
+                          child: Image.memory(_imageBytes!, fit: BoxFit.cover, width: double.infinity, height: double.infinity),
                         ),
                         Positioned(
                           top: 8, right: 8,
                           child: GestureDetector(
-                            onTap: () => setState(() => _image = null),
+                            onTap: () => setState(() { _ximage = null; _imageBytes = null; }),
                             child: Container(
                               width: 28, height: 28,
                               decoration: const BoxDecoration(
